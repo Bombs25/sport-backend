@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1\Auth;
+namespace App\Http\Controllers\Api\V1\Profile;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Auth\UpdateProfileRequest;
-use App\Services\Auth\UpdateProfileService;
+use App\Http\Requests\Api\V1\Profile\UpdateProfileRequest;
+use App\Services\Profile\UpdateProfileService;
 use App\Services\Register\RegisterUserPayloadBuilder;
 use Illuminate\Http\JsonResponse;
 

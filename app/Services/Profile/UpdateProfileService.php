@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Auth;
+namespace App\Services\Profile;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

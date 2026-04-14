@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Api\V1\Auth;
+namespace Tests\Feature\Api\V1\Profile;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;

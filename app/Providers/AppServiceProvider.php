@@ -66,6 +66,30 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(3)->by($id.'|'.$request->ip());
         });
 
+        RateLimiter::for('auth-follow-write', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(20)->by($id.'|'.$request->ip());
+        });
+
+        RateLimiter::for('auth-follow-read', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(60)->by($id.'|'.$request->ip());
+        });
+
+        RateLimiter::for('auth-team-read', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(60)->by($id.'|'.$request->ip());
+        });
+
+        RateLimiter::for('auth-team-write', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(30)->by($id.'|'.$request->ip());
+        });
+
         RateLimiter::for('auth-forgot-password', function (Request $request) {
             $email = Str::lower((string) $request->input('email', ''));
 

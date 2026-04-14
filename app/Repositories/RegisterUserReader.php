@@ -66,4 +66,37 @@ class RegisterUserReader
 
         return ! $query->exists();
     }
+
+    /**
+     * Indique si une relation de suivi **acceptée** existe dans au moins un sens entre deux utilisateurs.
+     */
+    public function hasAnyAcceptedFollowBetween(int $userIdA, int $userIdB): bool
+    {
+        if ($userIdA === $userIdB) {
+            return true;
+        }
+
+        return DB::table('follows')
+            ->where('status', 'accepted')
+            ->where(function ($query) use ($userIdA, $userIdB): void {
+                $query->where(function ($q) use ($userIdA, $userIdB): void {
+                    $q->where('follower_id', $userIdA)->where('following_id', $userIdB);
+                })->orWhere(function ($q) use ($userIdA, $userIdB): void {
+                    $q->where('follower_id', $userIdB)->where('following_id', $userIdA);
+                });
+            })
+            ->exists();
+    }
+
+    /**
+     * Le follower suit la cible avec un statut **accepted** (sens follower_id → following_id).
+     */
+    public function viewerFollowsTargetAccepted(int $followerId, int $followingId): bool
+    {
+        return DB::table('follows')
+            ->where('follower_id', $followerId)
+            ->where('following_id', $followingId)
+            ->where('status', 'accepted')
+            ->exists();
+    }
 }

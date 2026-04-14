@@ -414,8 +414,8 @@ return new class extends Migration
             $table->foreignId('sport_id')->constrained()->restrictOnDelete();
             $table->string('name')->unique();
             $table->string('slug')->unique();
-            $table->string('competition_type', 24)->default('leisure'); // leisure | competitive
-            $table->string('skill_level', 32)->nullable();
+            // $table->string('competition_type', 24)->default('leisure'); // leisure | competitive
+            // $table->string('skill_level', 32)->nullable();
             $table->text('description')->nullable();
             $table->string('hq_city', 120)->nullable()->index();
             $table->decimal('hq_latitude', 10, 7)->nullable();
