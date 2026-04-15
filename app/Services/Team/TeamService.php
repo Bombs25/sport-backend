@@ -3,8 +3,10 @@
 namespace App\Services\Team;
 
 use App\Models\Team;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class TeamService
 {
@@ -154,6 +156,215 @@ class TeamService
     }
 
     /**
+     * Enregistre une demande d'intégration d'un utilisateur dans une équipe.
+     *
+     * @throws ValidationException
+     */
+    public function requestIntegration(Team $team, int $userId): void
+    {
+        $this->ensureTeamIsCollective($team);
+        $this->ensureUserCanJoinSport($userId, (int) $team->sport_id, (int) $team->id);
+
+        $existingMembership = DB::table('team_members')
+            ->where('team_id', $team->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if ($existingMembership !== null && $existingMembership->status === 'active') {
+            throw ValidationException::withMessages([
+                'team_id' => __('Cet utilisateur fait déjà partie de cette équipe.'),
+            ]);
+        }
+
+        $now = now();
+
+        if ($existingMembership === null) {
+            DB::table('team_members')->insert([
+                'team_id' => $team->id,
+                'user_id' => $userId,
+                'role' => 'member',
+                'status' => 'pending',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        DB::table('team_members')
+            ->where('id', $existingMembership->id)
+            ->update([
+                'role' => 'member',
+                'status' => 'pending',
+                'updated_at' => $now,
+            ]);
+    }
+
+    /**
+     * Accepte ou refuse une demande d'intégration à une équipe.
+     *
+     * @throws ValidationException
+     */
+    public function decideIntegration(Team $team, int $applicantUserId, string $decision, int $actorUserId): void
+    {
+        $this->ensureCanManageIntegrations($team, $actorUserId);
+
+        $membership = DB::table('team_members')
+            ->where('team_id', $team->id)
+            ->where('user_id', $applicantUserId)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($membership === null) {
+            throw ValidationException::withMessages([
+                'asker_user_id' => __('Aucune demande d’intégration en attente pour cet utilisateur.'),
+            ]);
+        }
+
+        if ($decision === 'accept') {
+            $this->ensureUserCanJoinSport($applicantUserId, (int) $team->sport_id, (int) $team->id);
+
+            DB::table('team_members')
+                ->where('id', $membership->id)
+                ->update([
+                    'status' => 'active',
+                    'updated_at' => now(),
+                ]);
+
+            return;
+        }
+
+        DB::table('team_members')
+            ->where('id', $membership->id)
+            ->update([
+                'status' => 'rejected',
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
+     * Permet à un membre de quitter son équipe ou à un créateur/captain actif de retirer un membre.
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function removeMember(Team $team, int $actorUserId, int $memberUserId): void
+    {
+        $membership = DB::table('team_members')
+            ->where('team_id', $team->id)
+            ->where('user_id', $memberUserId)
+            ->where('status', 'active')
+            ->first();
+
+        if ($membership === null) {
+            throw ValidationException::withMessages([
+                'member_user_id' => __('Ce membre actif est introuvable dans cette équipe.'),
+            ]);
+        }
+
+        $isSelfLeave = $actorUserId === $memberUserId;
+        if (! $isSelfLeave) {
+            $this->ensureCanManageIntegrations($team, $actorUserId);
+        }
+
+        if ((int) $team->creator_id === $memberUserId) {
+            throw ValidationException::withMessages([
+                'member_user_id' => __('Le créateur ne peut pas être retiré de son équipe.'),
+            ]);
+        }
+
+        DB::table('team_members')
+            ->where('id', $membership->id)
+            ->update([
+                'role' => 'member',
+                'status' => 'left',
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
+     * Retourne le statut du user connecté vis-à-vis d'une équipe.
+     *
+     * @return array{team_id: int, is_member: bool, integration_requested: bool, membership_status: string|null, role: string|null}
+     */
+    public function membershipStatus(Team $team, int $userId): array
+    {
+        $membership = DB::table('team_members')
+            ->where('team_id', $team->id)
+            ->where('user_id', $userId)
+            ->select(['status', 'role'])
+            ->first();
+
+        $membershipStatus = $membership?->status;
+
+        return [
+            'team_id' => (int) $team->id,
+            'is_member' => $membershipStatus === 'active',
+            'integration_requested' => $membershipStatus === 'pending',
+            'membership_status' => $membershipStatus,
+            'role' => $membership?->role,
+        ];
+    }
+
+    /**
+     * Liste paginée des demandes d'intégration en attente pour une équipe.
+     *
+     * @return array{
+     *   items: list<array{user_id:int,name:string,email:string,avatar_url:string|null,requested_at:mixed}>,
+     *   pagination: array{current_page:int,per_page:int,total:int,last_page:int}
+     * }
+     *
+     * @throws AuthorizationException
+     */
+    public function listPendingIntegrations(Team $team, int $actorUserId, int $page = 1): array
+    {
+        $this->ensureCanManageIntegrations($team, $actorUserId);
+
+        $perPage = 10;
+        $safePage = max(1, $page);
+
+        $baseQuery = DB::table('team_members')
+            ->join('users', 'users.id', '=', 'team_members.user_id')
+            ->leftJoin('user_profiles', 'user_profiles.user_id', '=', 'users.id')
+            ->where('team_members.team_id', $team->id)
+            ->where('team_members.status', 'pending');
+
+        $total = (int) (clone $baseQuery)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+
+        $rows = $baseQuery
+            ->orderByDesc('team_members.created_at')
+            ->forPage($safePage, $perPage)
+            ->select([
+                'users.id as user_id',
+                'users.name',
+                'users.email',
+                'user_profiles.avatar_url',
+                'team_members.created_at as requested_at',
+            ])
+            ->get();
+
+        return [
+            'items' => $rows
+                ->map(static fn (object $row): array => [
+                    'user_id' => (int) $row->user_id,
+                    'name' => $row->name,
+                    'email' => $row->email,
+                    'avatar_url' => $row->avatar_url,
+                    'requested_at' => $row->requested_at,
+                ])
+                ->values()
+                ->all(),
+            'pagination' => [
+                'current_page' => $safePage,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+        ];
+    }
+
+    /**
      * Retourne le payload détaillé d'une équipe avec les informations sport et l'effectif actif.
      *
      * @return array<string, mixed>
@@ -179,6 +390,96 @@ class TeamService
         $membersCount = (int) ($countsMap[(int) $team->id] ?? 0);
 
         return $this->formatDetailRow($row, $membersCount);
+    }
+
+    /**
+     * Retourne les données pour la page profil équipe.
+     *
+     * @return array{
+     *   id:int,
+     *   name:string,
+     *   hq_city:string|null,
+     *   sport:array{id:int,name:string,slug:string,practice_type:string|null},
+     *   members_count:int,
+     *   members:array{
+     *     items:list<array{user_id:int,name:string,avatar_url:string|null,role:string}>,
+     *     pagination:array{current_page:int,per_page:int,total:int,last_page:int}
+     *   }
+     * }
+     */
+    public function buildProfilePayload(Team $team, int $page = 1): array
+    {
+        $teamRow = DB::table('teams')
+            ->join('sports', 'sports.id', '=', 'teams.sport_id')
+            ->where('teams.id', $team->id)
+            ->select([
+                'teams.id',
+                'teams.name',
+                'teams.hq_city',
+                'sports.id as sport_id',
+                'sports.name as sport_name',
+                'sports.slug as sport_slug',
+                'sports.practice_type as sport_practice_type',
+            ])
+            ->first();
+
+        if ($teamRow === null) {
+            abort(404);
+        }
+
+        $perPage = 10;
+        $safePage = max(1, $page);
+
+        $membersBaseQuery = DB::table('team_members')
+            ->join('users', 'users.id', '=', 'team_members.user_id')
+            ->leftJoin('user_profiles', 'user_profiles.user_id', '=', 'users.id')
+            ->where('team_members.team_id', $team->id)
+            ->where('team_members.status', 'active');
+
+        $membersCount = (int) (clone $membersBaseQuery)->count();
+        $lastPage = max(1, (int) ceil($membersCount / $perPage));
+
+        $memberRows = $membersBaseQuery
+            ->orderBy('team_members.role')
+            ->orderBy('users.name')
+            ->forPage($safePage, $perPage)
+            ->select([
+                'users.id as user_id',
+                'users.name',
+                'user_profiles.avatar_url',
+                'team_members.role',
+            ])
+            ->get();
+
+        return [
+            'id' => (int) $teamRow->id,
+            'name' => $teamRow->name,
+            'hq_city' => $teamRow->hq_city,
+            'sport' => [
+                'id' => (int) $teamRow->sport_id,
+                'name' => $teamRow->sport_name,
+                'slug' => $teamRow->sport_slug,
+                'practice_type' => $teamRow->sport_practice_type,
+            ],
+            'members_count' => $membersCount,
+            'members' => [
+                'items' => $memberRows
+                    ->map(static fn (object $row): array => [
+                        'user_id' => (int) $row->user_id,
+                        'name' => $row->name,
+                        'avatar_url' => $row->avatar_url,
+                        'role' => $row->role,
+                    ])
+                    ->values()
+                    ->all(),
+                'pagination' => [
+                    'current_page' => $safePage,
+                    'per_page' => $perPage,
+                    'total' => $membersCount,
+                    'last_page' => $lastPage,
+                ],
+            ],
+        ];
     }
 
     /**
@@ -289,5 +590,62 @@ class TeamService
         }
 
         return $slug;
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function ensureTeamIsCollective(Team $team): void
+    {
+        $practiceType = DB::table('sports')
+            ->where('id', $team->sport_id)
+            ->value('practice_type');
+
+        if ($practiceType !== 'collective') {
+            throw ValidationException::withMessages([
+                'team_id' => __('Seules les équipes de sport collectif acceptent des intégrations.'),
+            ]);
+        }
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function ensureUserCanJoinSport(int $userId, int $sportId, int $exceptTeamId): void
+    {
+        $alreadyHasSportTeam = DB::table('team_members')
+            ->join('teams', 'teams.id', '=', 'team_members.team_id')
+            ->where('team_members.user_id', $userId)
+            ->where('team_members.status', 'active')
+            ->where('teams.sport_id', $sportId)
+            ->where('teams.id', '!=', $exceptTeamId)
+            ->exists();
+
+        if ($alreadyHasSportTeam) {
+            throw ValidationException::withMessages([
+                'sport_id' => __('Un utilisateur ne peut pas avoir deux équipes actives du même sport.'),
+            ]);
+        }
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    private function ensureCanManageIntegrations(Team $team, int $actorUserId): void
+    {
+        if ((int) $team->creator_id === $actorUserId) {
+            return;
+        }
+
+        $isActiveCaptain = DB::table('team_members')
+            ->where('team_id', $team->id)
+            ->where('user_id', $actorUserId)
+            ->where('status', 'active')
+            ->where('role', 'captain')
+            ->exists();
+
+        if (! $isActiveCaptain) {
+            throw new AuthorizationException(__('Action non autorisée pour cette équipe.'));
+        }
     }
 }

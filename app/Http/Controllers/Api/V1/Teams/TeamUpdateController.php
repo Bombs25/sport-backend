@@ -13,8 +13,9 @@ use Illuminate\Http\JsonResponse;
  */
 class TeamUpdateController extends Controller
 {
-    public function __invoke(TeamUpdateRequest $request, Team $team, TeamService $service): JsonResponse
+    public function __invoke(TeamUpdateRequest $request, TeamService $service): JsonResponse
     {
+        $team = Team::query()->findOrFail((int) $request->route('team_id'));
         $service->updateTeam($team, $request->validated());
 
         return response()->json([

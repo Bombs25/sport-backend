@@ -12,8 +12,9 @@ use Illuminate\Http\JsonResponse;
  */
 class TeamDestroyController extends Controller
 {
-    public function __invoke(Team $team, TeamService $service): JsonResponse
+    public function __invoke(int $team_id, TeamService $service): JsonResponse
     {
+        $team = Team::query()->findOrFail($team_id);
         $this->authorize('delete', $team);
 
         $service->deleteTeam($team);
