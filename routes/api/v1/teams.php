@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Teams\TeamIntegrationDecisionController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationPendingListController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamListController;
+use App\Http\Controllers\Api\V1\Teams\TeamMatchRequestStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamMemberDestroyController;
 use App\Http\Controllers\Api\V1\Teams\TeamMembershipStatusShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamProfileShowController;
@@ -46,7 +47,9 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::post('teams/{team_id}/integrations', TeamIntegrationStoreController::class)->middleware('throttle:auth-team-write');
     // Sortie d'équipe (self) ou suppression d'un membre (créateur/captain actif).
     Route::delete('teams/{team_id}/members/{member_user_id}', TeamMemberDestroyController::class)->middleware('throttle:auth-team-write');
+    // Demande de match entre deux équipes du même sport.
+    Route::post('teams/{team_id}/match-requests', TeamMatchRequestStoreController::class)->middleware('throttle:auth-team-write');
 
     // Détail d'une équipe (membre actif uniquement). +++++++
-    Route::get('teams/{team_id}', TeamShowController::class)->middleware('throttle:auth-team-read');
+    // Route::get('teams/{team_id}', TeamShowController::class)->middleware('throttle:auth-team-read');
 });

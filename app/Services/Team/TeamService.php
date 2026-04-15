@@ -483,6 +483,113 @@ class TeamService
     }
 
     /**
+     * Crée une demande de match entre deux équipes.
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function requestMatch(
+        Team $homeTeam,
+        int $actorUserId,
+        int $awayTeamId,
+        string $scheduledAt,
+        ?string $venue = null,
+        ?string $notes = null,
+    ): int {
+        $this->ensureCanRequestMatch($homeTeam, $actorUserId);
+
+        if ((int) $homeTeam->id === $awayTeamId) {
+            throw ValidationException::withMessages([
+                'away_team_id' => __('Une équipe ne peut pas se défier elle-même.'),
+            ]);
+        }
+
+        $awayTeam = DB::table('teams')
+            ->where('id', $awayTeamId)
+            ->select(['id', 'sport_id'])
+            ->first();
+
+        if ($awayTeam === null) {
+            throw ValidationException::withMessages([
+                'away_team_id' => __('Équipe adverse introuvable.'),
+            ]);
+        }
+
+        if ((int) $homeTeam->sport_id !== (int) $awayTeam->sport_id) {
+            throw ValidationException::withMessages([
+                'away_team_id' => __('La demande de match est possible uniquement entre deux équipes du même sport.'),
+            ]);
+        }
+
+        $existingPendingBetweenTeams = DB::table('match_events')
+            ->where('status', 'requested')
+            ->where(function ($query) use ($homeTeam, $awayTeam): void {
+                $query
+                    ->where(function ($pairQuery) use ($homeTeam, $awayTeam): void {
+                        $pairQuery
+                            ->where('home_team_id', $homeTeam->id)
+                            ->where('away_team_id', $awayTeam->id);
+                    })
+                    ->orWhere(function ($pairQuery) use ($homeTeam, $awayTeam): void {
+                        $pairQuery
+                            ->where('home_team_id', $awayTeam->id)
+                            ->where('away_team_id', $homeTeam->id);
+                    });
+            })
+            ->exists();
+
+        if ($existingPendingBetweenTeams) {
+            throw ValidationException::withMessages([
+                'away_team_id' => __('Une demande de match est déjà en cours entre ces deux équipes.'),
+            ]);
+        }
+
+        $hasSameDateForRequester = DB::table('match_events')
+            ->where('home_team_id', $homeTeam->id)
+            ->where('status', 'requested')
+            ->where('scheduled_at', $scheduledAt)
+            ->exists();
+
+        if ($hasSameDateForRequester) {
+            throw ValidationException::withMessages([
+                'scheduled_at' => __('Cette équipe a déjà une demande de match en cours à cette date.'),
+            ]);
+        }
+
+        return (int) DB::table('match_events')->insertGetId([
+            'home_team_id' => $homeTeam->id,
+            'away_team_id' => $awayTeam->id,
+            'scheduled_at' => $scheduledAt,
+            'venue' => $venue,
+            'status' => 'requested',
+            'notes' => $notes,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    private function ensureCanRequestMatch(Team $team, int $actorUserId): void
+    {
+        if ((int) $team->creator_id === $actorUserId) {
+            return;
+        }
+
+        $isActiveCaptain = DB::table('team_members')
+            ->where('team_id', $team->id)
+            ->where('user_id', $actorUserId)
+            ->where('status', 'active')
+            ->where('role', 'captain')
+            ->exists();
+
+        if (! $isActiveCaptain) {
+            throw new AuthorizationException(__("Y'a que le createur ou le capitaine de l'equipe qui peuvent demander un match"));
+        }
+    }
+
+    /**
      * Calcule en une requête groupée le nombre de membres actifs pour une liste d'équipes.
      *
      * @param  array<int, int>  $teamIds

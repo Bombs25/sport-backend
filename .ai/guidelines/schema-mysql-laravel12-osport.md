@@ -477,6 +477,14 @@ return new class extends Migration
 
 Unité métier « match / défi / demande » entre deux équipes ; évite une chaîne de tables pour les statuts.
 
+**Règles métier — demande de match (obligatoires côté application, via Query Builder §1.7)** :
+
+- La demande est autorisée **uniquement** entre deux équipes du **même sport** (`teams.sport_id` identique entre `home_team_id` et `away_team_id`).
+- Si une demande est déjà en cours entre les **mêmes deux équipes** (statut de demande active), une nouvelle demande est refusée.
+- Si une équipe veut créer une nouvelle demande vers une autre équipe du même sport, la `scheduled_at` doit être **différente** de ses autres demandes en cours (anti-conflit de date).
+- Contrôle d’anti-doublon recommandé en normalisant la paire d’équipes dans la requête (`LEAST(home_team_id, away_team_id)` / `GREATEST(...)`) avant insertion.
+- Contrat API recommandé : `POST /api/v1/auth/teams/{team_id}/match-requests` avec `away_team_id` + `scheduled_at` (et optionnellement `venue`, `notes`).
+
 ```php
 <?php
 
@@ -495,7 +503,7 @@ return new class extends Migration
             $table->timestamp('scheduled_at')->nullable()->index();
             $table->string('venue', 255)->nullable();
             $table->string('status', 32)->default('scheduled')->index();
-            // scheduled | live | finished | cancelled | dispute ...
+            // requested | scheduled | live | finished | cancelled | dispute ...
             $table->text('notes')->nullable();
             $table->timestamps();
 
