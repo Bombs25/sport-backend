@@ -59,7 +59,7 @@ Cela permet de charger tout un fil de discussion par **partie** avec des index `
 
 ### 1.5 Match validé → post dans le fil
 
-Lorsqu’un **score est validé**, le backend crée (ou met à jour) **une** ligne `posts` liée au résultat : `posts.match_result_id` est une clé **nullable** et **unique** (un seul post « score validé » par résultat). Le champ `posts.kind` distingue les types de publication (ex. `text`, `media`, `score_validated`).
+Lorsqu’un **score est validé** (`match_results.status = validated` après acceptation par le capitaine / créateur adverse), le backend crée (ou met à jour) **une** ligne `posts` liée au résultat : `posts.match_result_id` est une clé **nullable** et **unique** (un seul post « score validé » par résultat). Le champ `posts.kind` distingue les types de publication (ex. `text`, `media`, `score_validated`). **Les deux équipes s’évaluent mutuellement** dans `match_opponent_evaluations` : une ligne dès l’envoi initial (score + évaluation par le soumissionnaire), une **deuxième** ligne lorsque l’adversaire **accepte** et note l’équipe qui a proposé le score. Selon le produit, le post peut être émis **dès** la validation du score ou **après** la **deuxième** évaluation si le parcours l’exige. **Aucun** post automatique de ce type en cas de **refus** ou tant qu’un **litige** (`match_result_disputes`) non résolu bloque la validation (règle produit à appliquer côté service).
 
 ### 1.6 Messagerie Sendbird vs MySQL
 
@@ -119,7 +119,13 @@ erDiagram
     teams ||--o{ match_events : home
     teams ||--o{ match_events : away
     match_events ||--|| match_results : yields
+    match_results ||--o{ match_opponent_evaluations : mutual_ratings
+    match_results ||--o| match_result_disputes : may_open
     match_results ||--o| posts : optional_score_feed
+    users ||--o{ match_opponent_evaluations : submits_as_user
+    teams ||--o{ match_opponent_evaluations : evaluates_as_team
+    teams ||--o{ match_opponent_evaluations : rated_opponent
+    users ||--o{ match_result_disputes : opens
     users ||--o{ posts : authors
     teams ||--o{ posts : optional_context
     posts ||--o{ post_media : contains
@@ -139,7 +145,7 @@ erDiagram
 
 ## 4. Ordre recommandé des migrations
 
-Les tables doivent être créées dans un ordre compatible avec les **clés étrangères**. `match_events` et `match_results` **précèdent** `posts` car `posts.match_result_id` référence `match_results`.
+Les tables doivent être créées dans un ordre compatible avec les **clés étrangères**. `match_events` et `match_results` **précèdent** `match_opponent_evaluations` et `match_result_disputes` ; ces tables **précèdent** `posts` car `posts.match_result_id` référence `match_results`.
 
 1. `users`  
 2. `user_profiles`  
@@ -151,15 +157,17 @@ Les tables doivent être créées dans un ordre compatible avec les **clés étr
 8. `team_members`  
 9. `match_events`  
 10. `match_results`  
-11. `posts`  
-12. `post_media`  
-13. `comments`  
-14. `post_likes`  
-15. `comment_likes`  
-16. `sendbird_accounts`  
-17. `notifications`  
-18. `subscription_plans`  
-19. `subscriptions`  
+11. `match_opponent_evaluations`  
+12. `match_result_disputes`  
+13. `posts`  
+14. `post_media`  
+15. `comments`  
+16. `post_likes`  
+17. `comment_likes`  
+18. `sendbird_accounts`  
+19. `notifications`  
+20. `subscription_plans`  
+21. `subscriptions`  
 
 > Les migrations Laravel **Breeze / Jetstream** (`password_reset_tokens`, `sessions`, `cache`, etc.) viennent en complément selon ta stack ; elles ne sont pas dupliquées ici.
 
@@ -521,7 +529,23 @@ return new class extends Migration
 
 ### 5.10 `match_results`
 
-Scores et cycle de validation (proposé, confirmé, contesté). **Après confirmation**, l’application peut créer le `post` de type `score_validated` référencé par `match_result_id`.
+Scores : **soumission du score et de la première évaluation** (fair-play / ponctualité de **l’adversaire**) par le **capitaine ou le créateur** d’une des deux équipes, puis **validation ou refus** par le **capitaine ou le créateur de l’équipe adverse**. **Les deux équipes s’évaluent** : une ligne `match_opponent_evaluations` à l’envoi initial, une **deuxième** lorsque l’adversaire **accepte** et évalue à son tour l’équipe qui a proposé le score (voir §5.11).
+
+**Cycle métier (application, Query Builder §1.7)** :
+
+1. **Soumission** : un utilisateur autorisé (capitaine / créateur) enregistre `home_score`, `away_score`, `submitted_by_user_id`, `submitted_at`, `status = pending_validation`, et **en même temps** la **première** ligne **`match_opponent_evaluations`** : l’**équipe du soumissionnaire** (`evaluator_team_id`) note **l’équipe adverse** (`evaluated_team_id`).
+2. **Réponse adverse** : le capitaine / créateur de l’**autre** équipe enregistre `responded_by_user_id`, `responded_at`, et soit **`validated`** (+ `validated_at`) soit **`refused`** (+ `refusal_reason` obligatoire côté validation applicative).
+3. **Deuxième évaluation si acceptation** : si **`validated`**, l’équipe adverse enregistre une **deuxième** ligne **`match_opponent_evaluations`** (son `evaluator_team_id`, `evaluated_team_id` = équipe du `submitted_by_user_id`). Même écran que l’acceptation ou étape immédiate (§1.5).
+4. **Litige** : en cas de refus, l’adversaire peut ouvrir **`match_result_disputes`** (preuves, motifs, file modération). Tant qu’un litige **non résolu** existe, le résultat ne doit pas être publié dans le fil ; le statut du résultat peut rester `refused` ou passer à `dispute_open` selon convention produit (les deux sont documentés ci-dessous).
+
+**Valeurs `match_results.status`** (chaîne indexée) :
+
+| Valeur | Signification |
+| --- | --- |
+| `pending_validation` | Score + **1re** évaluation (soumissionnaire → adversaire) ; en attente de l’autre capitaine / créateur. |
+| `validated` | Adversaire a accepté ; **2e** évaluation (adversaire → soumissionnaire) saisie ou à saisir selon parcours ; **§1.5** : création du `post` `score_validated` (éventuellement après les **deux** lignes `match_opponent_evaluations`). |
+| `refused` | Adversaire a refusé (`refusal_reason` renseigné). Litige optionnel via `match_result_disputes`. |
+| `dispute_open` | Refus assorti d’un litige **ouvert** (non résolu) — option pour simplifier les requêtes liste ; sinon dériver l’état par existence d’une ligne litige `pending` / `under_review`. |
 
 ```php
 <?php
@@ -539,12 +563,19 @@ return new class extends Migration
             $table->foreignId('match_event_id')->constrained('match_events')->cascadeOnDelete();
             $table->unsignedSmallInteger('home_score')->default(0);
             $table->unsignedSmallInteger('away_score')->default(0);
-            $table->string('status', 32)->default('pending')->index();
-            // pending | validated | disputed
+            $table->string('status', 32)->default('pending_validation')->index();
+            // pending_validation | validated | refused | dispute_open
+            $table->foreignId('submitted_by_user_id')->constrained('users')->restrictOnDelete();
+            $table->timestamp('submitted_at')->nullable();
+            $table->foreignId('responded_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('responded_at')->nullable();
             $table->timestamp('validated_at')->nullable();
+            $table->text('refusal_reason')->nullable();
             $table->timestamps();
 
             $table->unique('match_event_id');
+            $table->index(['submitted_by_user_id', 'status']);
+            $table->index(['responded_by_user_id', 'status']);
         });
     }
 
@@ -555,7 +586,116 @@ return new class extends Migration
 };
 ```
 
-### 5.11 `posts`
+### 5.11 `match_opponent_evaluations`
+
+**Évaluation croisée** des deux équipes (fair-play, ponctualité, remarques optionnelles) : **au plus deux lignes** par `match_result_id`, une par **équipe évaluatrice** (`evaluator_team_id`). Chaque ligne exprime « l’équipe A note l’équipe B » sur ce match ; `evaluated_team_id` est **toujours l’adversaire** de `evaluator_team_id` sur le `match_event` lié.
+
+| Moment | `evaluator_team_id` | `evaluated_team_id` |
+| --- | --- | --- |
+| Envoi initial (avec le score) | Équipe du `submitted_by_user_id` | L’autre équipe du match |
+| Après **validation** du score | Équipe du `responded_by_user_id` | Équipe du soumissionnaire du score |
+
+En cas de **refus**, seule la **première** ligne existe (le soumissionnaire a déjà noté l’adversaire ; l’adversaire ne complète pas sa note). Éventuel litige : §5.12.
+
+**Règles métier** :
+
+- `evaluator_user_id` : capitaine / créateur qui **saisit** pour `evaluator_team_id` (aligné sur `submitted_by_user_id` pour la 1re ligne, sur `responded_by_user_id` pour la 2e).
+- Unicité **`(match_result_id, evaluator_team_id)`** : une équipe ne peut envoyer qu’**une** évaluation par résultat.
+- `fair_play_rating` et `punctuality_rating` : entiers **1 à 5** (contrainte CHECK optionnelle selon version MySQL / migration SQL brute).
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('match_opponent_evaluations', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('match_result_id')->constrained('match_results')->cascadeOnDelete();
+            $table->foreignId('evaluator_team_id')->constrained('teams')->cascadeOnDelete();
+            $table->foreignId('evaluator_user_id')->constrained('users')->restrictOnDelete();
+            $table->foreignId('evaluated_team_id')->constrained('teams')->cascadeOnDelete();
+            $table->unsignedTinyInteger('fair_play_rating'); // 1–5
+            $table->unsignedTinyInteger('punctuality_rating'); // 1–5
+            $table->text('remarks')->nullable();
+            $table->timestamps();
+
+            // Index nommés : MySQL ≤ 64 caractères pour les identifiants.
+            $table->unique(['match_result_id', 'evaluator_team_id'], 'moe_result_eval_team_uidx');
+            $table->index(['evaluated_team_id', 'created_at'], 'moe_evaluated_team_created_idx');
+            $table->index(['evaluator_team_id', 'created_at'], 'moe_evaluator_team_created_idx');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('match_opponent_evaluations');
+    }
+};
+```
+
+### 5.12 `match_result_disputes`
+
+**Litige** après refus du score (ou contestation formelle) : motifs structurés (cohérents écran « Contester le résultat »), texte explicatif, pièce jointe optionnelle, cycle **modération**.
+
+**Valeurs `match_result_disputes.status`** :
+
+| Valeur | Signification |
+| --- | --- |
+| `pending` | Envoyé, en file modérateur. |
+| `under_review` | Pris en charge. |
+| `resolved` | Décision enregistrée (détail dans `resolution_notes` / champs métier ultérieurs). |
+| `rejected` | Rejet administratif (ex. signalement manifestement infondé). |
+
+Les colonnes `dispute_reason_score_incorrect`, `dispute_reason_fair_play`, `dispute_reason_behavior` reprennent les cases à cocher UX (au moins une à `true` côté application lors de l’envoi).
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('match_result_disputes', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('match_result_id')->constrained('match_results')->cascadeOnDelete();
+            $table->foreignId('opened_by_user_id')->constrained('users')->restrictOnDelete();
+            $table->boolean('dispute_reason_score_incorrect')->default(false);
+            $table->boolean('dispute_reason_fair_play')->default(false);
+            $table->boolean('dispute_reason_behavior')->default(false);
+            $table->text('details');
+            $table->string('evidence_path', 2048)->nullable();
+            $table->string('evidence_disk', 32)->nullable();
+            $table->string('status', 32)->default('pending')->index();
+            // pending | under_review | resolved | rejected
+            $table->foreignId('moderator_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('moderator_notes')->nullable();
+            $table->text('resolution_notes')->nullable();
+            $table->timestamp('resolved_at')->nullable();
+            $table->timestamps();
+
+            $table->index(['match_result_id', 'status']);
+            $table->index(['opened_by_user_id', 'created_at']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('match_result_disputes');
+    }
+};
+```
+
+### 5.13 `posts`
 
 Publications du fil ; `match_result_id` **unique nullable** lie le post automatique au score validé.
 
@@ -595,7 +735,7 @@ return new class extends Migration
 };
 ```
 
-### 5.12 `post_media`
+### 5.14 `post_media`
 
 Médias du carrousel ; charge paresseuse possible côté API.
 
@@ -631,7 +771,7 @@ return new class extends Migration
 };
 ```
 
-### 5.13 `comments`
+### 5.15 `comments`
 
 **Parties** (`parent_id` null) et **sous-parties** (réponses) avec `root_comment_id` et `depth`.
 
@@ -672,7 +812,7 @@ return new class extends Migration
 };
 ```
 
-### 5.14 `post_likes`
+### 5.16 `post_likes`
 
 ```php
 <?php
@@ -703,7 +843,7 @@ return new class extends Migration
 };
 ```
 
-### 5.15 `comment_likes`
+### 5.17 `comment_likes`
 
 ```php
 <?php
@@ -734,7 +874,7 @@ return new class extends Migration
 };
 ```
 
-### 5.16 `sendbird_accounts` — Option B Sendbird (1:1)
+### 5.18 `sendbird_accounts` — Option B Sendbird (1:1)
 
 ```php
 <?php
@@ -765,7 +905,7 @@ return new class extends Migration
 };
 ```
 
-### 5.17 `notifications` — Laravel 13 (canal `database`)
+### 5.19 `notifications` — Laravel 13 (canal `database`)
 
 Les alertes in-app **hors chat** (follow, like, demande de match, etc.) passent par le système [**Notifications**](https://laravel.com/docs/13.x/notifications) de Laravel pour **composer et envoyer** les événements : classes dans `app/Notifications`, canaux (`database`, `mail`, …), file d’attente éventuelle, et persistance via le **canal `database`** dans la table ci-dessous.
 
@@ -819,7 +959,7 @@ return new class extends Migration
 
 > **Conserver** ce schéma de table (polymorphisme `notifiable_*`, `data`, `type`, `read_at`) pour rester compatible avec le **canal `database`** de Laravel (même payload pour mail + database si besoin). Pour la **lecture**, rester en **Query Builder** (§1.7). Pour des index supplémentaires (ex. boîte de réception filtrée par `read_at`), ajoute une **migration d’alter** après `make:notifications-table`.
 
-### 5.18 `subscription_plans`
+### 5.20 `subscription_plans`
 
 ```php
 <?php
@@ -851,7 +991,7 @@ return new class extends Migration
 };
 ```
 
-### 5.19 `subscriptions`
+### 5.21 `subscriptions`
 
 ```php
 <?php
@@ -899,6 +1039,8 @@ return new class extends Migration
 | Likes hot | Compteur / « aimé par » | `(post_id, created_at)` sur `post_likes` |
 | Notifications | Liste / non lus / marquer lu via **Query Builder** sur `notifications` | `morphs('notifiable')` indexe `(notifiable_type, notifiable_id)` ; optionnel : index composite incluant `read_at` / `created_at` via migration séparée si besoin perf |
 | Matchs par équipe | Tableau de bord club | `(home_team_id, status, scheduled_at)` et miroir `away_team_id` |
+| Résultats en attente / litiges | File capitaine, modération | `match_results.status`, `(match_result_id, status)` sur `match_result_disputes` |
+| Évaluations croisées | Réputation par équipe (deux sens par match) | `unique (match_result_id, evaluator_team_id)` ; `(evaluated_team_id, created_at)` et `(evaluator_team_id, created_at)` |
 | Sports (référentiel) | Filtre « collectif vs individuel » (recherche, UX) | index sur `practice_type` ; valeurs attendues `collective` \| `individual` |
 | Équipes (annuaire) | Sport + date, sport + type compétition, sport + ville, créateur + date | voir §5.7 : `(sport_id, created_at)`, `(creator_id, created_at)`, `(sport_id, competition_type, created_at)`, `(sport_id, hq_city)` + `hq_city` seul |
 
@@ -919,6 +1061,8 @@ En implémentation, ces chaînes se traduisent par des **`JOIN`** en **Query Bui
 | Mes équipes | `users` → `team_members` → `teams` | 2 |
 | Matchs / défis (via équipe) | `users` → `team_members` → `teams` → `match_events` | 3 |
 | Résultat | `match_events` → `match_results` | +1 depuis l’événement (écran détail) |
+| Évaluations (x2 si validé) | `match_results` → `match_opponent_evaluations` | +1 depuis le résultat ; filtrer par `evaluator_team_id` / `evaluated_team_id` |
+| Litige | `match_results` → `match_result_disputes` | +1 depuis le résultat |
 | Post lié au score | `match_results` → `posts` | liaison directe optionnelle |
 | Fil + médias | `users` → `posts` → `post_media` | 2 |
 | Sous-commentaires | `users` → `comments` → `posts` | 2 vers le post ; `root_comment_id` pour regrouper |

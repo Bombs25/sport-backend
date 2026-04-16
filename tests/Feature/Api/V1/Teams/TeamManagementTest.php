@@ -1091,4 +1091,257 @@ class TeamManagementTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['scheduled_at']);
     }
+
+    public function test_captain_can_list_received_and_sent_match_requests(): void
+    {
+        $captain = User::factory()->create();
+        $otherCreator = User::factory()->create();
+        $sportId = $this->sportIdBySlug('football');
+
+        $homeTeamId = DB::table('teams')->insertGetId([
+            'creator_id' => $captain->id,
+            'sport_id' => $sportId,
+            'name' => 'List Match Home',
+            'slug' => 'list-match-home',
+            'competition_type' => 'leisure',
+            'skill_level' => null,
+            'description' => null,
+            'hq_city' => null,
+            'hq_latitude' => null,
+            'hq_longitude' => null,
+            'cover_image_url' => null,
+            'logo_url' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $awayTeamId = DB::table('teams')->insertGetId([
+            'creator_id' => $otherCreator->id,
+            'sport_id' => $sportId,
+            'name' => 'List Match Away',
+            'slug' => 'list-match-away',
+            'competition_type' => 'leisure',
+            'skill_level' => null,
+            'description' => null,
+            'hq_city' => null,
+            'hq_latitude' => null,
+            'hq_longitude' => null,
+            'cover_image_url' => null,
+            'logo_url' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('team_members')->insert([
+            ['team_id' => $homeTeamId, 'user_id' => $captain->id, 'role' => 'captain', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+            ['team_id' => $awayTeamId, 'user_id' => $otherCreator->id, 'role' => 'captain', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('match_events')->insert([
+            'home_team_id' => $homeTeamId,
+            'away_team_id' => $awayTeamId,
+            'scheduled_at' => now()->addDay()->toDateTimeString(),
+            'venue' => 'Arena One',
+            'status' => 'requested',
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('match_events')->insert([
+            'home_team_id' => $awayTeamId,
+            'away_team_id' => $homeTeamId,
+            'scheduled_at' => now()->addDays(2)->toDateTimeString(),
+            'venue' => 'Arena Two',
+            'status' => 'requested',
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('match_events')->insert([
+            'home_team_id' => $awayTeamId,
+            'away_team_id' => $homeTeamId,
+            'scheduled_at' => now()->addDays(3)->toDateTimeString(),
+            'venue' => 'Arena Three',
+            'status' => 'scheduled',
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $captainToken = $captain->createToken('auth')->plainTextToken;
+
+        $this->withToken($captainToken)
+            ->getJson('/api/v1/auth/teams/match-requests?type=sent')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'sent')
+            ->assertJsonCount(1, 'data.items');
+
+        $this->withToken($captainToken)
+            ->getJson('/api/v1/auth/teams/match-requests?type=received')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'received')
+            ->assertJsonCount(2, 'data.items')
+            ->assertJsonStructure([
+                'data' => [
+                    'items' => [
+                        '*' => [
+                            'home_team' => [
+                                'id',
+                                'name',
+                                'members' => [
+                                    '*' => ['user_id', 'name', 'avatar_url', 'role'],
+                                ],
+                            ],
+                            'away_team' => [
+                                'id',
+                                'name',
+                                'members' => [
+                                    '*' => ['user_id', 'name', 'avatar_url', 'role'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+
+        $this->withToken($captainToken)
+            ->getJson('/api/v1/auth/teams/match-requests?type=received&status=accepted')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'received')
+            ->assertJsonPath('data.status', 'accepted')
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.status', 'accepted');
+
+        $this->withToken($captainToken)
+            ->getJson('/api/v1/auth/teams/match-requests?type=received&sport_name=Football')
+            ->assertOk()
+            ->assertJsonPath('data.type', 'received')
+            ->assertJsonPath('data.sport_name', 'Football')
+            ->assertJsonCount(2, 'data.items');
+    }
+
+    public function test_non_captain_non_creator_can_list_match_requests_with_management_flag_false(): void
+    {
+        $creator = User::factory()->create();
+        $regularMember = User::factory()->create();
+        $sportId = $this->sportIdBySlug('football');
+
+        $teamId = DB::table('teams')->insertGetId([
+            'creator_id' => $creator->id,
+            'sport_id' => $sportId,
+            'name' => 'Restricted Match List Team',
+            'slug' => 'restricted-match-list-team',
+            'competition_type' => 'leisure',
+            'skill_level' => null,
+            'description' => null,
+            'hq_city' => null,
+            'hq_latitude' => null,
+            'hq_longitude' => null,
+            'cover_image_url' => null,
+            'logo_url' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('team_members')->insert([
+            ['team_id' => $teamId, 'user_id' => $creator->id, 'role' => 'captain', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+            ['team_id' => $teamId, 'user_id' => $regularMember->id, 'role' => 'member', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $memberToken = $regularMember->createToken('auth')->plainTextToken;
+
+        $this->withToken($memberToken)
+            ->getJson('/api/v1/auth/teams/match-requests?type=received')
+            ->assertOk()
+            ->assertJsonPath('data.can_manage_match_requests', false)
+            ->assertJsonCount(0, 'data.items');
+    }
+
+    public function test_receiver_can_accept_or_refuse_match_request(): void
+    {
+        $homeCaptain = User::factory()->create();
+        $awayCaptain = User::factory()->create();
+        $sportId = $this->sportIdBySlug('football');
+
+        $homeTeamId = DB::table('teams')->insertGetId([
+            'creator_id' => $homeCaptain->id,
+            'sport_id' => $sportId,
+            'name' => 'Decision Home Team',
+            'slug' => 'decision-home-team',
+            'competition_type' => 'leisure',
+            'skill_level' => null,
+            'description' => null,
+            'hq_city' => null,
+            'hq_latitude' => null,
+            'hq_longitude' => null,
+            'cover_image_url' => null,
+            'logo_url' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $awayTeamId = DB::table('teams')->insertGetId([
+            'creator_id' => $awayCaptain->id,
+            'sport_id' => $sportId,
+            'name' => 'Decision Away Team',
+            'slug' => 'decision-away-team',
+            'competition_type' => 'leisure',
+            'skill_level' => null,
+            'description' => null,
+            'hq_city' => null,
+            'hq_latitude' => null,
+            'hq_longitude' => null,
+            'cover_image_url' => null,
+            'logo_url' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('team_members')->insert([
+            ['team_id' => $homeTeamId, 'user_id' => $homeCaptain->id, 'role' => 'captain', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+            ['team_id' => $awayTeamId, 'user_id' => $awayCaptain->id, 'role' => 'captain', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $matchEventId = DB::table('match_events')->insertGetId([
+            'home_team_id' => $homeTeamId,
+            'away_team_id' => $awayTeamId,
+            'scheduled_at' => now()->addDay()->toDateTimeString(),
+            'venue' => null,
+            'status' => 'requested',
+            'notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $awayToken = $awayCaptain->createToken('auth')->plainTextToken;
+
+        $this->withToken($awayToken)
+            ->patchJson('/api/v1/auth/teams/match-requests/'.$matchEventId, [
+                'decision' => 'accept',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('match_events', [
+            'id' => $matchEventId,
+            'status' => 'scheduled',
+        ]);
+
+        DB::table('match_events')->where('id', $matchEventId)->update([
+            'status' => 'requested',
+            'updated_at' => now(),
+        ]);
+
+        $this->withToken($awayToken)
+            ->patchJson('/api/v1/auth/teams/match-requests/'.$matchEventId, [
+                'decision' => 'refuse',
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('match_events', [
+            'id' => $matchEventId,
+            'status' => 'cancelled',
+        ]);
+    }
 }

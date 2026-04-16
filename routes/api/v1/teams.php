@@ -5,7 +5,12 @@ use App\Http\Controllers\Api\V1\Teams\TeamIntegrationDecisionController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationPendingListController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamListController;
+use App\Http\Controllers\Api\V1\Teams\TeamMatchDisputeStoreController;
+use App\Http\Controllers\Api\V1\Teams\TeamMatchRequestDecisionController;
+use App\Http\Controllers\Api\V1\Teams\TeamMatchRequestListController;
 use App\Http\Controllers\Api\V1\Teams\TeamMatchRequestStoreController;
+use App\Http\Controllers\Api\V1\Teams\TeamMatchResultRespondController;
+use App\Http\Controllers\Api\V1\Teams\TeamMatchResultStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamMemberDestroyController;
 use App\Http\Controllers\Api\V1\Teams\TeamMembershipStatusShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamProfileShowController;
@@ -49,6 +54,19 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::delete('teams/{team_id}/members/{member_user_id}', TeamMemberDestroyController::class)->middleware('throttle:auth-team-write');
     // Demande de match entre deux équipes du même sport.
     Route::post('teams/{team_id}/match-requests', TeamMatchRequestStoreController::class)->middleware('throttle:auth-team-write');
+
+    // ////////// page match request ////////////
+    // Liste des demandes de match (reçu/envoyé), paginée.
+    Route::get('teams/match-requests', TeamMatchRequestListController::class)->middleware('throttle:auth-team-read');
+    // Décision sur une demande reçue: accept/refuse.
+    Route::patch('teams/match-requests/{match_event_id}', TeamMatchRequestDecisionController::class)->middleware('throttle:auth-team-write');
+
+    // Premier envoi : score + 1re évaluation — uniquement **home_team_id** (demandeur du match, même sens que POST match-requests).
+    Route::post('teams/{team_id}/match-events/{match_event_id}/result', TeamMatchResultStoreController::class)->middleware('throttle:auth-team-write');
+    // 2e envoi : validation ou refus (+ 2e évaluation si validation) — uniquement capitaine / créateur **away_team_id**.
+    Route::patch('teams/match-events/{match_event_id}/result', TeamMatchResultRespondController::class)->middleware('throttle:auth-team-write');
+    // Litige après refus : même acteur que la réponse adverse (away).
+    Route::post('teams/match-events/{match_event_id}/result/dispute', TeamMatchDisputeStoreController::class)->middleware('throttle:auth-team-write');
 
     // Détail d'une équipe (membre actif uniquement). +++++++
     // Route::get('teams/{team_id}', TeamShowController::class)->middleware('throttle:auth-team-read');
