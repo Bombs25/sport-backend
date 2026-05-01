@@ -12,7 +12,11 @@ class TeamMatchRequestStoreController extends Controller
 {
     public function __invoke(TeamMatchRequestStoreRequest $request, TeamService $service, int $team_id): JsonResponse
     {
-        $homeTeam = Team::query()->findOrFail($team_id);
+        $validatedTeamId = filter_var($team_id, FILTER_VALIDATE_INT);
+        if ($validatedTeamId === false) {
+            abort(400, __('Identifiant d\'équipe invalide.'));
+        }
+        $homeTeam = Team::query()->findOrFail($validatedTeamId); // LE HOME TEAM EST L'EQUIPE QUI FAIT LA REQUETE
 
         $matchEventId = $service->requestMatch(
             $homeTeam,

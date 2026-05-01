@@ -145,7 +145,9 @@ return [
 
     'redis' => [
 
-        'client' => env('REDIS_CLIENT', 'phpredis'),
+        'client' => extension_loaded('redis')
+            ? env('REDIS_CLIENT', 'phpredis')
+            : 'predis',
 
         'options' => [
             // « Cluster » = Redis en grappe native : plusieurs nœuds qui partagent les données par partitions (slots) et se font remplacer en cas de panne.
@@ -202,6 +204,65 @@ return [
             // Borne supérieure (ms) du délai entre deux essais pour cette connexion cache.
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
+
+        'post_notifications' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_POST_NOTIFICATIONS_DB', '4'),
+            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
+        // Les options de contrôle
+        // max_retries (Nombre de tentatives)
+        // C'est le nombre de fois que Laravel va essayer de "frapper à la porte" de Redis avant d'abandonner et d'envoyer une erreur 500 à l'utilisateur.
+
+        // Conseil : On met souvent 3. Trop peu, et une micro-coupure fait planter ton site. Trop, et l'utilisateur attend 10 secondes devant une page blanche.
+
+        // retry_interval (Intervalle fixe)
+        // C'est le temps d'attente (en millisecondes) entre chaque tentative.
+
+        // Note : Cette option est souvent ignorée si tu utilises un algorithme de backoff plus intelligent.
+
+        // backoff_base (Le point de départ)
+        // C'est le délai initial (en ms) avant la toute première tentative de reconnexion. Si tu mets 100, la première attente sera de 100ms.
+
+        // backoff_cap (Le plafond)
+        // C'est la limite maximale d'attente. Même si l'algorithme calcule qu'il faut attendre 30 secondes, si ton backoff_cap est à 1000, il n'attendra jamais plus de 1 seconde (1000ms). Cela évite que tes processus PHP ne restent bloqués indéfiniment.
+
+        // Les algorithmes de Backoff (La stratégie)
+        // Le but ici est d'éviter le "Thundering Herd" (le troupeau qui piétine) : si 5000 utilisateurs essaient de se reconnecter exactement à la même milliseconde après une panne, ils vont achever ton serveur Redis.
+
+        // constant
+        // Logique : Attend toujours le même temps (ex: 100ms, 100ms, 100ms).
+
+        // Usage : Très basique, peu recommandé pour 200k users.
+
+        // exponential
+        // Logique : Double le temps à chaque essai (100ms, 200ms, 400ms, 800ms...).
+
+        // Usage : Très efficace pour laisser le temps au serveur de "reprendre son souffle".
+
+        // uniform
+        // Logique : Ajoute un délai aléatoire mais de manière linéaire. C'est un entre-deux.
+
+        // decorrelated_jitter (Le plus recommandé)
+        // Logique : C'est l'algorithme de pointe (utilisé par AWS). Il utilise une dose de chaos (aléatoire) pour calculer le prochain essai en se basant sur le précédent.
+
+        // Pourquoi pour ton réseau social ? C'est celui qui sépare le mieux les tentatives de reconnexion des milliers d'utilisateurs. Au lieu d'arriver par vagues, les connexions arrivent "en pluie" fine, ce qui est beaucoup plus facile à gérer pour un processeur.
+
+        // equal_jitter
+        // Logique : Un mélange d'exponentiel et d'aléatoire, mais avec une part fixe. C'est un bon milieu entre "prévisible" et "aléatoire".
+
+        // 'max_retries' => 3,
+        // 'backoff_algorithm' => 'decorrelated_jitter',
+        // 'backoff_base' => 100, // Commence à 100ms
+        // 'backoff_cap' => 1000, // Ne jamais attendre plus d'une seconde
 
     ],
 

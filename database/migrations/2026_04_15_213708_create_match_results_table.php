@@ -16,6 +16,8 @@ return new class extends Migration
             $table->foreignId('match_event_id')->constrained('match_events')->cascadeOnDelete();
             $table->unsignedSmallInteger('home_score')->default(0);
             $table->unsignedSmallInteger('away_score')->default(0);
+            $table->unsignedInteger('total_comments')->default(0);
+            $table->unsignedInteger('total_likes')->default(0);
             $table->string('status', 32)->default('score_pending_validation')->index();
             $table->foreignId('submitted_by_user_id')->constrained('users')->restrictOnDelete();
             $table->timestamp('submitted_at')->nullable();

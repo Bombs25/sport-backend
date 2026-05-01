@@ -24,6 +24,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'password',
+        'fcm_token',
     ];
 
     /**
@@ -55,5 +56,15 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendEmailVerificationNotification(): void
     {
         app(EmailVerificationOtpService::class)->sendForUser($this);
+    }
+
+    /**
+     * Specifies the user's FCM token
+     *
+     * @return string|array
+     */
+    public function routeNotificationForFcm()
+    {
+        return $this->fcm_token;
     }
 }

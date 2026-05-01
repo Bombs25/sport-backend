@@ -39,7 +39,7 @@ class RegisterCredentialsService
                 'password' => $password,
             ]);
 
-            $handle = 'osport_'.Str::lower(Str::random(16));
+            $handle = $this->resolveUniqueHandle($givenName, $familyName);
 
             /*
              * Ville + position WGS-84 fournies par React Native dès l’inscription (sélecteur / carte).
@@ -74,5 +74,24 @@ class RegisterCredentialsService
                 'token' => $user->createToken('auth'),
             ];
         });
+    }
+
+    private function resolveUniqueHandle(string $givenName, string $familyName): string
+    {
+        $prefix = 'osport_';
+        $baseCore = Str::slug(trim($givenName.'_'.$familyName), '_');
+        $baseCore = $baseCore !== '' ? $baseCore : 'player';
+        $baseCore = Str::limit($baseCore, 20, '');
+
+        for ($attempt = 0; $attempt < 20; $attempt++) {
+            $suffix = '_'.Str::lower(Str::random(4));
+            $handle = $prefix.$baseCore.$suffix;
+
+            if (! DB::table('user_profiles')->where('handle', $handle)->exists()) {
+                return $handle;
+            }
+        }
+
+        return $prefix.Str::lower(Str::random(25));
     }
 }

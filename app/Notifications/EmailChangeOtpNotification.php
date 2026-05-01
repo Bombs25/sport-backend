@@ -3,17 +3,20 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class EmailChangeOtpNotification extends Notification
+class EmailChangeOtpNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(
         public string $code,
         public string $newEmail,
-    ) {}
+    ) {
+        $this->onConnection('deferred');
+    }
 
     /**
      * @return array<int, string>

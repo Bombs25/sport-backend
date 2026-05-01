@@ -14,3 +14,4 @@ require __DIR__.'/api/v1/register.php';
 require __DIR__.'/api/v1/account.php';
 // Équipes : CRUD sous `/api/v1/auth/teams...`.
 require __DIR__.'/api/v1/teams.php';
+require __DIR__.'/api/v1/posts.php';
