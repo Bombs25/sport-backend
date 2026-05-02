@@ -8,7 +8,13 @@ use RuntimeException;
 class ExpoPushService
 {
     /**
-     * @param  array<int, string>  $tokens
+     * Envoie une notification push via Expo à la liste de tokens fournie.
+     *
+     * @param  array<int, string>  $tokens  Liste des tokens Expo (ExponentPushToken) des destinataires
+     * @param  string  $title  Titre de la notification
+     * @param  string  $body  Corps de la notification
+     * @param  string|null  $imageUrl  URL de l'image à afficher dans la notification
+     * @param  string|null  $data  Données JSON à inclure dans la notification
      */
     public function send(array $tokens, string $title, string $body, ?string $imageUrl = null, ?string $data = null): void
     {
