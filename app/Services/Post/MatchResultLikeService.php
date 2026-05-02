@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Services\Post;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class MatchResultLikeService
+{
+    /**
+     * Applique un like/dislike (retrait du like) sur un résultat de match de manière transactionnelle (ACID).
+     *
+     * @return array{liked: bool, changed: bool, likes_count: int, submitted_by_user_id: int}
+     *
+     * @throws ValidationException
+     */
+    public function toggleLike(
+        int $publicationId,
+        int $userId,
+        string $publicationType,
+        string $action,
+    ): array {
+        return DB::transaction(function () use ($publicationId, $userId, $publicationType, $action): array {
+            $result = DB::table('match_results')
+                ->where('id', $publicationId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($result === null) {
+                throw ValidationException::withMessages([
+                    'post_id' => __('Résultat de match introuvable.'),
+                ]);
+            }
+
+            $existingLike = DB::table('post_likes')
+                ->where('users_id', $userId)
+                ->where('publication_id', $publicationId)
+                ->where('publication_type', $publicationType)
+                ->lockForUpdate()
+                ->first();
+
+            $likesCount = (int) $result->total_likes;
+            $liked = $existingLike !== null;
+            $changed = false;
+
+            if ($action === 'like') {
+                if ($existingLike === null) {
+                    DB::table('post_likes')->insert([
+                        'users_id' => $userId,
+                        'publication_id' => $publicationId,
+                        'publication_type' => $publicationType,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    DB::table('match_results')
+                        ->where('id', $publicationId)
+                        ->increment('total_likes');
+
+                    $likesCount++;
+                    $liked = true;
+                    $changed = true;
+                }
+            } else {
+                if ($existingLike !== null) {
+                    DB::table('post_likes')
+                        ->where('users_id', $userId)
+                        ->where('publication_id', $publicationId)
+                        ->where('publication_type', $publicationType)
+                        ->delete();
+
+                    DB::table('match_results')
+                        ->where('id', $publicationId)
+                        ->where('total_likes', '>', 0)
+                        ->decrement('total_likes');
+
+                    $likesCount = max(0, $likesCount - 1);
+                    $liked = false;
+                    $changed = true;
+                } else {
+                    $liked = false;
+                }
+            }
+
+            return [
+                'liked' => $liked,
+                'changed' => $changed,
+                'likes_count' => $likesCount,
+                'submitted_by_user_id' => (int) $result->submitted_by_user_id,
+            ];
+        });
+    }
+}

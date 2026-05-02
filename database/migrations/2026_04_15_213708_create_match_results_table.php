@@ -17,6 +17,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('home_score')->default(0);
             $table->unsignedSmallInteger('away_score')->default(0);
             $table->unsignedInteger('total_comments')->default(0);
+            // Agrégat : une ligne par utilisateur dans `post_likes` ; dislike = suppression du like.
             $table->unsignedInteger('total_likes')->default(0);
             $table->string('status', 32)->default('score_pending_validation')->index();
             $table->foreignId('submitted_by_user_id')->constrained('users')->restrictOnDelete();

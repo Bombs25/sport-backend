@@ -72,14 +72,19 @@ return [
             'block_for' => null,
             'after_commit' => false,
         ],
-        'post_notifications' => [
-            'driver' => 'redis',
-            'connection' => env('REDIS_POST_NOTIFICATIONS_CONNECTION', 'post_notifications'),
-            'queue' => env('REDIS_POST_NOTIFICATIONS_QUEUE', 'post_notifications'),
-            'retry_after' => (int) env('REDIS_POST_NOTIFICATIONS_RETRY_AFTER', 90),
-            'block_for' => null,
-            'after_commit' => false,
-        ],
+        'post_notifications' => match (env('POST_NOTIFICATIONS_QUEUE_DRIVER', 'redis')) {
+            'sync' => [
+                'driver' => 'sync',
+            ],
+            default => [
+                'driver' => 'redis',
+                'connection' => env('REDIS_POST_NOTIFICATIONS_CONNECTION', 'post_notifications'),
+                'queue' => env('REDIS_POST_NOTIFICATIONS_QUEUE', 'post_notifications'),
+                'retry_after' => (int) env('REDIS_POST_NOTIFICATIONS_RETRY_AFTER', 90),
+                'block_for' => null,
+                'after_commit' => false,
+            ],
+        },
 
         'deferred' => [
             'driver' => 'deferred',
