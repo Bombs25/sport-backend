@@ -23,9 +23,9 @@ class LoginService
     {
         $email = Str::lower($email);
 
-        $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
+        $user = User::query()->whereRaw('email = ?', [$email])->first();
 
-        if ($user === null || ! Hash::check($password, $user->password)) {
+        if (! $user instanceof User || ! Hash::check($password, $user->password)) {
             return null;
         }
 

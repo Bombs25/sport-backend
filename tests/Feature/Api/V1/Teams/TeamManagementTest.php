@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Teams;
 
 use App\Models\User;
+use App\Support\UserProfileLocation;
 use Database\Seeders\SportsSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -785,19 +786,17 @@ class TeamManagementTest extends TestCase
             ['team_id' => $teamId, 'user_id' => $member->id, 'role' => 'member', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        DB::table('user_profiles')->insert([
+        DB::table('user_profiles')->insert(array_merge([
             'user_id' => $member->id,
             'display_name' => 'Member Profile',
             'handle' => 'member-profile-'.$member->id,
             'bio' => null,
             'avatar_url' => 'https://cdn.test/avatar-member.jpg',
             'is_private' => false,
-            'latitude' => null,
-            'longitude' => null,
             'city' => null,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
 
         $viewerToken = $viewer->createToken('auth')->plainTextToken;
 

@@ -6,6 +6,14 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Cycle score : soumission et 1re évaluation par l’équipe à domicile, réponse (validation ou refus) par l’away.
+ *
+ * Cohérence `match_events.status` / `match_results.status` :
+ * — Tant que le score n’est pas validé par l’away, l’événement reste `scheduled`
+ *   (y compris résultat `score_pending_validation` ou `refused` ; un refus ne met pas l’événement en `finished`).
+ * — Sur validation adverse ({@see respondToMatchResult}), le résultat passe à `validated` et l’événement à `finished`.
+ */
 class MatchResultService
 {
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Support\UserProfileLocation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -19,7 +20,7 @@ class RegisterUserReader
         return DB::table('users')
             ->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')
             ->where('users.id', $userId)
-            ->select([
+            ->select(array_merge([
                 'users.id',
                 'users.name',
                 'users.email',
@@ -30,12 +31,11 @@ class RegisterUserReader
                 'user_profiles.bio',
                 'user_profiles.avatar_url',
                 'user_profiles.is_private',
-                'user_profiles.latitude',
-                'user_profiles.longitude',
+            ], UserProfileLocation::selectLatitudeLongitude('user_profiles'), [
                 'user_profiles.city',
                 'user_profiles.address_line',
                 'user_profiles.birth_date',
-            ])
+            ]))
             ->first();
     }
 

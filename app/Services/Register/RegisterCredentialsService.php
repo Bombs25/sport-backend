@@ -3,6 +3,7 @@
 namespace App\Services\Register;
 
 use App\Models\User;
+use App\Support\UserProfileLocation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -45,21 +46,19 @@ class RegisterCredentialsService
              * Ville + position WGS-84 fournies par React Native dès l’inscription (sélecteur / carte).
              * Peuvent être affinées ensuite via `register/location` (adresse, nouveau point).
              */
-            DB::table('user_profiles')->insert([
+            DB::table('user_profiles')->insert(array_merge([
                 'user_id' => $user->id,
                 'display_name' => Str::limit($civilName, 64, ''),
                 'handle' => $handle,
                 'bio' => null,
                 'avatar_url' => null,
                 'is_private' => false,
-                'latitude' => $latitude,
-                'longitude' => $longitude,
                 'city' => $city,
                 'address_line' => null,
                 'birth_date' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ], UserProfileLocation::columnsFromLatLng($latitude, $longitude)));
 
             /*
              * Événement Laravel standard après création de compte. Avec MustVerifyEmail sur User,

@@ -2,6 +2,7 @@
 
 namespace App\Services\Register;
 
+use App\Support\UserProfileLocation;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -25,12 +26,13 @@ class RegisterLocationService
         ?string $city,
         ?string $addressLine,
     ): void {
-        DB::table('user_profiles')->where('user_id', $userId)->update([
-            'latitude' => $latitude,
-            'longitude' => $longitude,
-            'city' => $city,
-            'address_line' => $addressLine,
-            'updated_at' => now(),
-        ]);
+        DB::table('user_profiles')->where('user_id', $userId)->update(array_merge(
+            UserProfileLocation::columnsFromLatLng($latitude, $longitude),
+            [
+                'city' => $city,
+                'address_line' => $addressLine,
+                'updated_at' => now(),
+            ],
+        ));
     }
 }

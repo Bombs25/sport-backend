@@ -2,6 +2,7 @@
 
 namespace App\Services\Profile;
 
+use App\Support\UserProfileLocation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -56,12 +57,17 @@ class UpdateProfileService
             $profileUpdates['avatar_url'] = $validated['avatar_url'];
         }
 
-        if (array_key_exists('latitude', $validated)) {
-            $profileUpdates['latitude'] = $validated['latitude'];
-        }
-
-        if (array_key_exists('longitude', $validated)) {
-            $profileUpdates['longitude'] = $validated['longitude'];
+        if (array_key_exists('latitude', $validated) || array_key_exists('longitude', $validated)) {
+            $current = UserProfileLocation::currentLatLngForUser($userId);
+            $lat = array_key_exists('latitude', $validated) ? $validated['latitude'] : $current['latitude'];
+            $lng = array_key_exists('longitude', $validated) ? $validated['longitude'] : $current['longitude'];
+            $profileUpdates = array_merge(
+                $profileUpdates,
+                UserProfileLocation::columnsFromLatLng(
+                    $lat !== null ? (float) $lat : null,
+                    $lng !== null ? (float) $lng : null,
+                ),
+            );
         }
 
         if (array_key_exists('city', $validated)) {

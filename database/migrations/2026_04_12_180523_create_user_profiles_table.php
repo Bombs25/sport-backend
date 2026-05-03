@@ -16,12 +16,12 @@ return new class extends Migration
             $table->text('bio')->nullable();
             $table->string('avatar_url', 512)->nullable();
             $table->boolean('is_private')->default(false);
-            $table->decimal('latitude', 10, 7)->nullable();
-            $table->decimal('longitude', 10, 7)->nullable();
+            $table->geography('location', subtype: 'point', srid: 4326)->nullable();
             $table->string('city', 120)->nullable()->index();
             $table->timestamps();
+            $table->index('user_id');
+            $table->index('handle');
 
-            $table->unique('user_id');
         });
     }
 

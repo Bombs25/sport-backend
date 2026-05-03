@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Profile;
 
 use App\Models\User;
+use App\Support\UserProfileLocation;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -17,21 +18,19 @@ class UserPublicProfileTest extends TestCase
         $target = User::factory()->create(['name' => 'Cible Publique']);
         $token = $viewer->createToken('auth')->plainTextToken;
 
-        DB::table('user_profiles')->insert([
+        DB::table('user_profiles')->insert(array_merge([
             'user_id' => $target->id,
             'display_name' => 'Cible Publique',
             'handle' => 'cible_pub',
             'bio' => 'Bio test',
             'avatar_url' => null,
             'is_private' => false,
-            'latitude' => null,
-            'longitude' => null,
             'city' => 'Lyon',
             'address_line' => null,
             'birth_date' => null,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
 
         $this->getJson('/api/v1/auth/users/'.$target->id.'/profile', [
             'Authorization' => 'Bearer '.$token,
@@ -47,21 +46,19 @@ class UserPublicProfileTest extends TestCase
         $target = User::factory()->create();
         $token = $viewer->createToken('auth')->plainTextToken;
 
-        DB::table('user_profiles')->insert([
+        DB::table('user_profiles')->insert(array_merge([
             'user_id' => $target->id,
             'display_name' => 'Privé',
             'handle' => 'prive_1',
             'bio' => null,
             'avatar_url' => null,
             'is_private' => true,
-            'latitude' => null,
-            'longitude' => null,
             'city' => null,
             'address_line' => null,
             'birth_date' => null,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
 
         $this->getJson('/api/v1/auth/users/'.$target->id.'/profile', [
             'Authorization' => 'Bearer '.$token,
@@ -74,21 +71,19 @@ class UserPublicProfileTest extends TestCase
         $target = User::factory()->create();
         $token = $viewer->createToken('auth')->plainTextToken;
 
-        DB::table('user_profiles')->insert([
+        DB::table('user_profiles')->insert(array_merge([
             'user_id' => $target->id,
             'display_name' => 'Privé',
             'handle' => 'prive_2',
             'bio' => null,
             'avatar_url' => null,
             'is_private' => true,
-            'latitude' => null,
-            'longitude' => null,
             'city' => null,
             'address_line' => null,
             'birth_date' => null,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
 
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,

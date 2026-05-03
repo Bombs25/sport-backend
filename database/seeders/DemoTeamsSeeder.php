@@ -25,7 +25,12 @@ class DemoTeamsSeeder extends Seeder
             return;
         }
 
-        $userIds = DB::table('users')->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $userIds = DB::table('users')
+            ->orderBy('id')
+            ->limit(500)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
         $sportIds = DB::table('sports')->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
         if ($userIds === [] || $sportIds === []) {

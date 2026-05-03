@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Profile;
 
 use App\Models\User;
+use App\Support\UserProfileLocation;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -18,21 +19,19 @@ class UpdateProfileTest extends TestCase
         ]);
         $token = $user->createToken('auth')->plainTextToken;
 
-        DB::table('user_profiles')->insert([
+        DB::table('user_profiles')->insert(array_merge([
             'user_id' => $user->id,
             'display_name' => 'Jean Dupont',
             'handle' => 'jean_dupont',
             'bio' => null,
             'avatar_url' => null,
             'is_private' => false,
-            'latitude' => null,
-            'longitude' => null,
             'city' => null,
             'address_line' => null,
             'birth_date' => null,
             'created_at' => now(),
             'updated_at' => now(),
-        ]);
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
 
         $this->patchJson('/api/v1/auth/profile', [
             'given_name' => 'Marie',
@@ -70,36 +69,32 @@ class UpdateProfileTest extends TestCase
         $otherUser = User::factory()->create();
 
         DB::table('user_profiles')->insert([
-            [
+            array_merge([
                 'user_id' => $currentUser->id,
                 'display_name' => 'Current User',
                 'handle' => 'current_handle',
                 'bio' => null,
                 'avatar_url' => null,
                 'is_private' => false,
-                'latitude' => null,
-                'longitude' => null,
                 'city' => null,
                 'address_line' => null,
                 'birth_date' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ],
-            [
+            ], UserProfileLocation::columnsFromLatLng(null, null)),
+            array_merge([
                 'user_id' => $otherUser->id,
                 'display_name' => 'Other User',
                 'handle' => 'taken_handle',
                 'bio' => null,
                 'avatar_url' => null,
                 'is_private' => false,
-                'latitude' => null,
-                'longitude' => null,
                 'city' => null,
                 'address_line' => null,
                 'birth_date' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ],
+            ], UserProfileLocation::columnsFromLatLng(null, null)),
         ]);
 
         $this->patchJson('/api/v1/auth/profile', [
