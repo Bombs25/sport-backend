@@ -17,11 +17,13 @@ class FetchPostService
      */
     public const MATCH_RESULT_LIKE_PUBLICATION_TYPES = ['regular', 'automatic'];
 
+    public const MATCH_RESULT_FEED_STATUS = 'validated';
+
     /**
      * @param  array<int, int>  $clientViewedMatchResultIds  Identifiants déjà vus côté client (ex. MMKV) ; si vide, lecture cache puis `user_post_views`.
-     * @return Collection<int, object>
+     * @return array{items: Collection<int, object>, count: int}
      */
-    public function fetchMatchResultFeed(int $viewerUserId, array $clientViewedMatchResultIds, int $limit): Collection
+    public function fetchMatchResultFeed(int $viewerUserId, array $clientViewedMatchResultIds, int $limit): array
     {
         $viewedIds = $this->resolveViewedMatchResultIds($viewerUserId, $clientViewedMatchResultIds);
 
@@ -33,7 +35,10 @@ class FetchPostService
             ->all();
 
         if ($followingIds === []) {
-            return collect();
+            return [
+                'items' => collect(),
+                'count' => 0,
+            ];
         }
 
         $viewerLikesSub = DB::table('post_likes')
@@ -49,6 +54,7 @@ class FetchPostService
                 $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
             })
             ->whereIn('match_results.submitted_by_user_id', $followingIds)
+            ->where('match_results.status', self::MATCH_RESULT_FEED_STATUS)
             ->orderByRaw('COALESCE(match_results.validated_at, match_results.submitted_at, match_results.created_at) DESC')
             ->orderByDesc('match_results.id')
             ->limit($limit)
@@ -74,7 +80,7 @@ class FetchPostService
                 'away_teams.id as away_team_id',
                 'away_teams.name as away_team_name',
                 'away_teams.logo_url as away_team_logo_url',
-                'viewer_match_likes.publication_id as liker_id',
+                DB::raw("'amis' AS tag")
             ])
             ->addSelect(DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'));
 
@@ -82,11 +88,16 @@ class FetchPostService
             $query->whereNotIn('match_results.id', $viewedIds);
         }
 
-        return $query->get()->map(function (object $row): object {
+        $items = $query->get()->map(function (object $row): object {
             $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
 
             return $row;
         });
+
+        return [
+            'items' => $items,
+            'count' => $items->count(),
+        ];
     }
 
     /**

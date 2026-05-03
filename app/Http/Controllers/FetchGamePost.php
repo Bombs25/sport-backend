@@ -15,10 +15,11 @@ class FetchGamePost extends Controller
         $viewed = $request->validated('viewed_post_ids') ?? [];
         $limit = (int) ($request->validated('limit') ?? 20);
 
-        $items = $fetchPostService->fetchMatchResultFeed($userId, $viewed, $limit);
+        $feed = $fetchPostService->fetchMatchResultFeed($userId, $viewed, $limit);
 
         return response()->json([
-            'data' => $items,
+            'data' => $feed['items'],
+            'count' => $feed['count'],
         ]);
     }
 }

@@ -1,7 +1,7 @@
 <?php
 
 /*
-| Fil « matchs » : résultats (`match_results`) publiés par les utilisateurs suivis, hors posts déjà vus.
+| Fil « matchs » : résultats (`match_results` avec `status = validated`) publiés par les utilisateurs suivis, hors posts déjà vus.
 | GET `/api/v1/auth/posts/feed` — query optionnelle :
 | - `viewed_post_ids` : chaîne = `encodeURIComponent(JSON.stringify([12, 34]))` (obligatoirement un tableau stringifié côté frontend).
 | - `limit` (défaut 20, max 50).

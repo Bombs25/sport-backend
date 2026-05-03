@@ -29,10 +29,40 @@ class FetchGamePostTest extends TestCase
     }
 
     /**
+     * Les ids JSON peuvent arriver en string ; on normalise pour des assertions stables.
+     *
+     * @param  list<array<string, mixed>>|null  $data
+     * @return list<int>
+     */
+    private function feedResultIds(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            return [];
+        }
+
+        return collect($data)
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    private function newViewer(): User
+    {
+        $user = User::factory()->createOne();
+        $this->assertInstanceOf(User::class, $user);
+
+        return $user;
+    }
+
+    /**
      * @return array{match_event_id: int, match_result_id: int, author: User}
      */
-    private function createMatchResultSubmittedBy(User $author, ?string $validatedAt = null, ?string $submittedAt = null): array
-    {
+    private function createMatchResultSubmittedBy(
+        User $author,
+        ?string $validatedAt = null,
+        ?string $submittedAt = null,
+        string $status = 'validated',
+    ): array {
         $sportId = $this->sportIdBySlug('football');
         $now = now();
 
@@ -86,18 +116,21 @@ class FetchGamePostTest extends TestCase
         ]);
 
         $submitted = $submittedAt ?? $now->toDateTimeString();
+        $validatedAtValue = $status === 'validated'
+            ? ($validatedAt ?? $now->toDateTimeString())
+            : null;
         $matchResultId = (int) DB::table('match_results')->insertGetId([
             'match_event_id' => $matchEventId,
             'home_score' => 1,
             'away_score' => 0,
             'total_comments' => 0,
             'total_likes' => 0,
-            'status' => 'validated',
+            'status' => $status,
             'submitted_by_user_id' => $author->id,
             'submitted_at' => $submitted,
             'responded_by_user_id' => null,
             'responded_at' => null,
-            'validated_at' => $validatedAt ?? $now->toDateTimeString(),
+            'validated_at' => $validatedAtValue,
             'refusal_reason' => null,
             'created_at' => $now,
             'updated_at' => $now,
@@ -113,9 +146,9 @@ class FetchGamePostTest extends TestCase
     public function test_returns_results_from_followed_users_only(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
-        $followed = User::factory()->create();
-        $stranger = User::factory()->create();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
+        $stranger = User::factory()->createOne();
 
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,
@@ -128,22 +161,62 @@ class FetchGamePostTest extends TestCase
         $fromFollowed = $this->createMatchResultSubmittedBy($followed);
         $fromStranger = $this->createMatchResultSubmittedBy($stranger);
 
-        $ids = collect(
-            $this->actingAs($viewer, 'sanctum')
-                ->getJson('/api/v1/auth/posts/feed')
-                ->assertOk()
-                ->json('data')
-        )->pluck('id')->all();
+        $response = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 1);
 
-        $this->assertContains($fromFollowed['match_result_id'], $ids);
-        $this->assertNotContains($fromStranger['match_result_id'], $ids);
+        $ids = $this->feedResultIds($response->json('data'));
+
+        $this->assertContains((int) $fromFollowed['match_result_id'], $ids);
+        $this->assertNotContains((int) $fromStranger['match_result_id'], $ids);
+    }
+
+    public function test_feed_excludes_match_results_that_are_not_validated(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
+
+        DB::table('follows')->insert([
+            'follower_id' => $viewer->id,
+            'following_id' => $followed->id,
+            'status' => 'accepted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $validated = $this->createMatchResultSubmittedBy($followed);
+        $pending = $this->createMatchResultSubmittedBy($followed, null, null, 'score_pending_validation');
+
+        $response = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 1);
+
+        $ids = $this->feedResultIds($response->json('data'));
+
+        $this->assertContains((int) $validated['match_result_id'], $ids);
+        $this->assertNotContains((int) $pending['match_result_id'], $ids);
+    }
+
+    public function test_count_is_zero_when_viewer_has_no_accepted_follows(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+
+        $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('data', []);
     }
 
     public function test_includes_viewer_has_liked_from_post_likes(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
-        $followed = User::factory()->create();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
 
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,
@@ -167,18 +240,21 @@ class FetchGamePostTest extends TestCase
         $data = $this->actingAs($viewer, 'sanctum')
             ->getJson('/api/v1/auth/posts/feed')
             ->assertOk()
+            ->assertJsonPath('count', 2)
             ->json('data');
 
-        $byId = collect($data)->keyBy('id');
-        $this->assertTrue($byId[$liked['match_result_id']]['viewer_has_liked']);
-        $this->assertFalse($byId[$notLiked['match_result_id']]['viewer_has_liked']);
+        $byId = collect($data)->keyBy(fn (array $row): int => (int) $row['id']);
+        $likedId = (int) $liked['match_result_id'];
+        $notLikedId = (int) $notLiked['match_result_id'];
+        $this->assertTrue((bool) $byId[$likedId]['viewer_has_liked']);
+        $this->assertFalse((bool) $byId[$notLikedId]['viewer_has_liked']);
     }
 
     public function test_excludes_client_viewed_ids(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
-        $followed = User::factory()->create();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,
             'following_id' => $followed->id,
@@ -195,18 +271,19 @@ class FetchGamePostTest extends TestCase
 
         $response = $this->actingAs($viewer, 'sanctum')
             ->getJson('/api/v1/auth/posts/feed?'.$query)
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('count', 1);
 
-        $ids = collect($response->json('data'))->pluck('id')->all();
-        $this->assertNotContains($a['match_result_id'], $ids);
-        $this->assertContains($b['match_result_id'], $ids);
+        $ids = $this->feedResultIds($response->json('data'));
+        $this->assertNotContains((int) $a['match_result_id'], $ids);
+        $this->assertContains((int) $b['match_result_id'], $ids);
     }
 
     public function test_rejects_viewed_post_ids_when_sent_as_query_array_brackets(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
-        $followed = User::factory()->create();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,
             'following_id' => $followed->id,
@@ -230,7 +307,7 @@ class FetchGamePostTest extends TestCase
     public function test_rejects_invalid_json_for_viewed_post_ids(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
+        $viewer = $this->newViewer();
 
         $this->actingAs($viewer, 'sanctum')
             ->getJson('/api/v1/auth/posts/feed?viewed_post_ids='.rawurlencode('not-json'))
@@ -241,8 +318,8 @@ class FetchGamePostTest extends TestCase
     public function test_falls_back_to_user_post_views_when_client_sends_no_viewed_list(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
-        $followed = User::factory()->create();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,
             'following_id' => $followed->id,
@@ -262,21 +339,22 @@ class FetchGamePostTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $ids = collect(
-            $this->actingAs($viewer, 'sanctum')
-                ->getJson('/api/v1/auth/posts/feed')
-                ->json('data')
-        )->pluck('id')->all();
+        $response = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 1);
 
-        $this->assertNotContains($a['match_result_id'], $ids);
-        $this->assertContains($b['match_result_id'], $ids);
+        $ids = $this->feedResultIds($response->json('data'));
+
+        $this->assertNotContains((int) $a['match_result_id'], $ids);
+        $this->assertContains((int) $b['match_result_id'], $ids);
     }
 
     public function test_orders_by_publication_date_newest_first(): void
     {
         Cache::flush();
-        $viewer = User::factory()->create();
-        $followed = User::factory()->create();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
         DB::table('follows')->insert([
             'follower_id' => $viewer->id,
             'following_id' => $followed->id,
@@ -288,12 +366,16 @@ class FetchGamePostTest extends TestCase
         $older = $this->createMatchResultSubmittedBy($followed, '2020-01-01 12:00:00', '2020-01-01 10:00:00');
         $newer = $this->createMatchResultSubmittedBy($followed, '2025-06-01 12:00:00', '2025-06-01 10:00:00');
 
-        $ids = collect(
-            $this->actingAs($viewer, 'sanctum')
-                ->getJson('/api/v1/auth/posts/feed')
-                ->json('data')
-        )->pluck('id')->all();
+        $response = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 2);
 
-        $this->assertSame([$newer['match_result_id'], $older['match_result_id']], array_slice($ids, 0, 2));
+        $ids = $this->feedResultIds($response->json('data'));
+
+        $this->assertSame(
+            [(int) $newer['match_result_id'], (int) $older['match_result_id']],
+            array_slice($ids, 0, 2)
+        );
     }
 }

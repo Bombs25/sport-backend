@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -16,13 +17,21 @@ return new class extends Migration
             $table->text('bio')->nullable();
             $table->string('avatar_url', 512)->nullable();
             $table->boolean('is_private')->default(false);
-            $table->geography('location', subtype: 'point', srid: 4326)->nullable();
+            $table->geometry('location', subtype: 'point', srid: 4326)->nullable();
             $table->string('city', 120)->nullable()->index();
             $table->timestamps();
-            $table->index('user_id');
             $table->index('handle');
-
         });
+
+        /*
+         * MySQL : un index SPATIAL exige une colonne NOT NULL (erreur 1252 si `location` est nullable).
+         * Index fonctionnel sur lat/lng dérivés du POINT (MySQL 8.0.13+) pour accélérer les filtres par borne / proximité.
+         */
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            DB::statement(
+                'CREATE INDEX user_profiles_location_lat_lng_idx ON user_profiles ((ST_Latitude(`location`)), (ST_Longitude(`location`)))'
+            );
+        }
     }
 
     public function down(): void
