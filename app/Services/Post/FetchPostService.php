@@ -25,7 +25,7 @@ class FetchPostService
     /** Rayon « proches » pour la strate centre d'intérêt (mètres). */
     public const CENTRE_INTERET_RADIUS_METERS = 500_000;
 
-    public const MATCH_RESULTS_LIMIT = 500;
+    public const MATCH_RESULTS_LIMIT = 100;
 
     /**
      * @param  array<int, int>  $clientViewedMatchResultIds  Identifiants déjà vus côté client (ex. MMKV) ; si vide, lecture cache puis `user_post_views`.
