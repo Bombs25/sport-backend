@@ -9,7 +9,7 @@ use Illuminate\Database\Seeder;
  * Jeu de données cohérent pour toute l’app **telle que migrée** (pas de tables `posts`, `subscriptions`, etc. tant qu’elles n’existent pas).
  *
  * Couverture métier : sports, utilisateurs, profils, sports pratiqués, follows, équipes, adhésions, matchs,
- * résultats (≥ 200 via {@see DemoBulkMatchResultsSeeder}), évaluations, litiges, commentaires, réponses, likes, jetons push (fcm_token), jetons Sanctum démo.
+ * résultats (≥ 500_000 via {@see DemoBulkMatchResultsSeeder}), évaluations, litiges, commentaires, réponses, likes, jetons push (fcm_token), jetons Sanctum démo.
  *
  * Non couvert volontairement : `notifications` (morph UUID vs id utilisateur entier), tables framework (`jobs`, `cache`, …).
  *

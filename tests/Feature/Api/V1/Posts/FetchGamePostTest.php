@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Posts;
 
 use App\Models\User;
 use App\Services\Post\FetchPostService;
+use App\Support\UserProfileLocation;
 use Database\Seeders\SportsSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -52,6 +53,35 @@ class FetchGamePostTest extends TestCase
         $this->assertInstanceOf(User::class, $user);
 
         return $user;
+    }
+
+    private function insertUserProfileWithLocation(User $user, float $lat, float $lon): void
+    {
+        $now = now();
+        DB::table('user_profiles')->insert(array_merge([
+            'user_id' => $user->id,
+            'display_name' => 'DN '.$user->id,
+            'handle' => 'h'.bin2hex(random_bytes(8)),
+            'bio' => null,
+            'avatar_url' => null,
+            'is_private' => false,
+            'city' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], UserProfileLocation::columnsFromLatLng($lat, $lon)));
+    }
+
+    private function insertUserSport(User $user, int $sportId): void
+    {
+        $now = now();
+        DB::table('user_sports')->insert([
+            'user_id' => $user->id,
+            'sport_id' => $sportId,
+            'is_favorite' => true,
+            'skill_level' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     /**
@@ -377,5 +407,182 @@ class FetchGamePostTest extends TestCase
             [(int) $newer['match_result_id'], (int) $older['match_result_id']],
             array_slice($ids, 0, 2)
         );
+    }
+
+    public function test_centre_interet_feed_returns_nearby_non_followed_with_shared_sport(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+        $stranger = User::factory()->createOne();
+        $footballId = $this->sportIdBySlug('football');
+
+        $this->insertUserProfileWithLocation($viewer, 48.8566, 2.3522);
+        $this->insertUserProfileWithLocation($stranger, 48.8570, 2.3525);
+        $this->insertUserSport($viewer, $footballId);
+        $this->insertUserSport($stranger, $footballId);
+
+        $nearby = $this->createMatchResultSubmittedBy($stranger);
+
+        $httpData = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->json('data');
+
+        $this->assertSame(FetchPostService::CENTRE_INTERET_TAG, $httpData[0]['tag']);
+        $this->assertSame((int) $nearby['match_result_id'], (int) $httpData[0]['id']);
+
+        $feed = app(FetchPostService::class)->fetchMatchResultCentreInteretFeed((int) $viewer->id, [], 20);
+        $this->assertSame(1, $feed['count']);
+        $row = $feed['items']->first();
+        $this->assertNotNull($row);
+        $this->assertSame(FetchPostService::CENTRE_INTERET_TAG, $row->tag);
+        $this->assertSame((int) $nearby['match_result_id'], (int) $row->id);
+        $this->assertNotNull($row->distance_km);
+        $this->assertGreaterThan(0.0, (float) $row->distance_km);
+        $this->assertLessThanOrEqual(
+            FetchPostService::CENTRE_INTERET_RADIUS_METERS / 1000.0,
+            (float) $row->distance_km,
+        );
+    }
+
+    public function test_centre_interet_feed_orders_by_distance_km_asc(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+        $closerAuthor = User::factory()->createOne();
+        $fartherAuthor = User::factory()->createOne();
+        $footballId = $this->sportIdBySlug('football');
+
+        $this->insertUserProfileWithLocation($viewer, 48.8566, 2.3522);
+        $this->insertUserProfileWithLocation($closerAuthor, 48.8568, 2.3523);
+        $this->insertUserProfileWithLocation($fartherAuthor, 48.8700, 2.3522);
+        foreach ([$viewer, $closerAuthor, $fartherAuthor] as $u) {
+            $this->insertUserSport($u, $footballId);
+        }
+
+        $farResult = $this->createMatchResultSubmittedBy($fartherAuthor, '2025-01-01 12:00:00');
+        $nearResult = $this->createMatchResultSubmittedBy($closerAuthor, '2025-06-01 12:00:00');
+
+        $feed = app(FetchPostService::class)->fetchMatchResultCentreInteretFeed((int) $viewer->id, [], 20);
+        $this->assertSame(2, $feed['count']);
+        $rows = $feed['items'];
+        $d0 = (float) (data_get($rows[0], 'distance_km') ?? -1);
+        $d1 = (float) (data_get($rows[1], 'distance_km') ?? -1);
+        $this->assertTrue($d0 <= $d1, 'distance du 1er post <= distance du 2e (km)');
+        $this->assertSame((int) $closerAuthor->id, (int) $rows[0]->submitted_by_user_id);
+        $this->assertSame((int) $fartherAuthor->id, (int) $rows[1]->submitted_by_user_id);
+        $this->assertSame((int) $nearResult['match_result_id'], (int) $rows[0]->id);
+        $this->assertSame((int) $farResult['match_result_id'], (int) $rows[1]->id);
+    }
+
+    public function test_http_feed_unions_amis_then_centre_interet_when_under_cap(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
+        $stranger = User::factory()->createOne();
+        $footballId = $this->sportIdBySlug('football');
+
+        DB::table('follows')->insert([
+            'follower_id' => $viewer->id,
+            'following_id' => $followed->id,
+            'status' => 'accepted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->insertUserProfileWithLocation($viewer, 48.8566, 2.3522);
+        $this->insertUserProfileWithLocation($stranger, 48.8570, 2.3525);
+        $this->insertUserSport($viewer, $footballId);
+        $this->insertUserSport($stranger, $footballId);
+
+        $fromFollowed = $this->createMatchResultSubmittedBy($followed);
+        $fromStranger = $this->createMatchResultSubmittedBy($stranger);
+
+        $httpData = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 2)
+            ->json('data');
+
+        $this->assertSame('amis', $httpData[0]['tag']);
+        $this->assertSame((int) $fromFollowed['match_result_id'], (int) $httpData[0]['id']);
+        $this->assertSame(FetchPostService::CENTRE_INTERET_TAG, $httpData[1]['tag']);
+        $this->assertSame((int) $fromStranger['match_result_id'], (int) $httpData[1]['id']);
+
+        $centre = app(FetchPostService::class)->fetchMatchResultCentreInteretFeed((int) $viewer->id, [], 20);
+        $this->assertSame(1, $centre['count']);
+        $centreRow = $centre['items']->first();
+        $this->assertNotNull($centreRow);
+        $this->assertSame(FetchPostService::CENTRE_INTERET_TAG, $centreRow->tag);
+        $this->assertSame((int) $fromStranger['match_result_id'], (int) $centreRow->id);
+    }
+
+    public function test_centre_interet_requires_shared_sport(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
+        $stranger = User::factory()->createOne();
+
+        DB::table('follows')->insert([
+            'follower_id' => $viewer->id,
+            'following_id' => $followed->id,
+            'status' => 'accepted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->insertUserProfileWithLocation($viewer, 48.8566, 2.3522);
+        $this->insertUserProfileWithLocation($stranger, 48.8570, 2.3525);
+        $this->insertUserSport($viewer, $this->sportIdBySlug('football'));
+        $this->insertUserSport($stranger, $this->sportIdBySlug('tennis'));
+
+        $this->createMatchResultSubmittedBy($followed);
+        $this->createMatchResultSubmittedBy($stranger);
+
+        $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 1);
+
+        $centre = app(FetchPostService::class)->fetchMatchResultCentreInteretFeed((int) $viewer->id, [], 20);
+        $this->assertSame(0, $centre['count']);
+    }
+
+    public function test_centre_interet_excludes_followed_users_as_authors(): void
+    {
+        Cache::flush();
+        $viewer = $this->newViewer();
+        $followed = User::factory()->createOne();
+        $footballId = $this->sportIdBySlug('football');
+
+        DB::table('follows')->insert([
+            'follower_id' => $viewer->id,
+            'following_id' => $followed->id,
+            'status' => 'accepted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->insertUserProfileWithLocation($viewer, 48.8566, 2.3522);
+        $this->insertUserProfileWithLocation($followed, 48.8570, 2.3525);
+        $this->insertUserSport($viewer, $footballId);
+        $this->insertUserSport($followed, $footballId);
+
+        $only = $this->createMatchResultSubmittedBy($followed);
+
+        $httpData = $this->actingAs($viewer, 'sanctum')
+            ->getJson('/api/v1/auth/posts/feed')
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->json('data');
+
+        $this->assertSame('amis', $httpData[0]['tag']);
+        $this->assertSame((int) $only['match_result_id'], (int) $httpData[0]['id']);
+
+        $centre = app(FetchPostService::class)->fetchMatchResultCentreInteretFeed((int) $viewer->id, [], 20);
+        $this->assertSame(0, $centre['count']);
     }
 }

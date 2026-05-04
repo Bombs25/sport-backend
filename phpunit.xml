@@ -20,6 +20,8 @@
     <!--
         force="true" : sans ça, des variables DB_* exportées dans le shell (ou héritées de l’IDE) peuvent
         écraser ces valeurs → les tests RefreshDatabase migrent alors sur TA base de dev et la VIDENT.
+        `tests/bootstrap.php` ré-impose aussi DB_* + `PHPUNIT_GUARD_DATABASE` ; `tests/TestCase.php` refuse
+        toute base dont le nom ≠ `PHPUNIT_GUARD_DATABASE` (défaut `laravel` = base jetable ; ne pas pointer vers ta base principale).
     -->
     <php>
         <env name="APP_ENV" value="testing" force="true"/>
@@ -27,11 +29,12 @@
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
-        <!-- MySQL requis : colonnes spatial POINT (`user_profiles.location`) ; créer la base une fois : CREATE DATABASE laravel_testing; -->
+        <!-- MySQL requis : POINT spatial ; base **tests** uniquement : CREATE DATABASE laravel; (ne pas utiliser ta base principale) -->
         <env name="DB_CONNECTION" value="mysql" force="true"/>
         <env name="DB_HOST" value="127.0.0.1" force="true"/>
         <env name="DB_PORT" value="3306" force="true"/>
-        <env name="DB_DATABASE" value="laravel_testing" force="true"/>
+        <env name="PHPUNIT_GUARD_DATABASE" value="laravel" force="true"/>
+        <env name="DB_DATABASE" value="laravel" force="true"/>
         <env name="DB_USERNAME" value="root" force="true"/>
         <env name="DB_PASSWORD" value="" force="true"/>
         <env name="DB_URL" value="" force="true"/>

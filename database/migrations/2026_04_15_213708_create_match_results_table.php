@@ -31,6 +31,7 @@ return new class extends Migration
             $table->unique('match_event_id');
             $table->index(['submitted_by_user_id', 'status']);
             $table->index(['responded_by_user_id', 'status']);
+            $table->index(['validated_at', 'status']);
         });
     }
 

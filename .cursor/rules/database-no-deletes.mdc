@@ -1,0 +1,26 @@
+---
+description: Interdiction de supprimer des données en base ; exception uniquement sur demande explicite
+alwaysApply: true
+---
+
+# Base de données — aucune suppression sans ordre explicite
+
+**Priorité maximale** : avant toute commande, requête, migration, seeder, tinker ou suggestion, vérifier que rien ne supprime de données.
+
+## Règle
+
+- **Ne jamais** supprimer de données dans une table (ni une seule ligne) : pas de `DELETE`, `TRUNCATE`, `DROP` (table / vue / etc. contenant des données), ni équivalents via ORM, jobs, ou scripts.
+- **Ne jamais** lancer ni proposer des opérations qui effacent ou réinitialisent massivement la base (ex. `migrate:fresh`, `migrate:reset`, `db:wipe`, truncate global) **sans** que l’utilisateur l’ait **explicitement** demandé pour **cette** action précise.
+- **Seule exception** : une suppression ou une opération destructive **uniquement** si l’utilisateur le demande **clairement et explicitement** dans le message (ex. « supprime la ligne X », « exécute migrate:fresh sur ma machine de test »). Dans le doute, **ne pas** supprimer et demander confirmation.
+
+## Tests PHPUnit / Laravel
+
+- **`php artisan test` / PHPUnit** avec `LazilyRefreshDatabase` **réécrivent** la base ciblée par `DB_DATABASE` au moment du run.
+- **Ne jamais** supposer que seul `phpunit.xml` suffit : le shell ou l’IDE peut exporter `DB_*` et écraser la config.
+- Le dépôt impose **`tests/bootstrap.php`** (constante globale **`OSPORT_PHPUNIT_MYSQL_DATABASE`** = base jetable **`laravel`**) + garde dans **`tests/TestCase.php`** : la base doit être **exactement** celle de `PHPUNIT_GUARD_DATABASE` (même défaut). Ne pas contourner ce garde-fou ; ne jamais cibler la base principale du projet pour PHPUnit.
+
+## Conséquences pour l’agent
+
+- Ne pas « deviner » qu’un nettoyage est souhaité.
+- Ne pas exécuter de commandes destructrices par commodité ou pour « réparer » sans ordre explicite.
+- Si une tâche nécessite normalement une suppression, proposer une alternative non destructive ou demander un ordre explicite.

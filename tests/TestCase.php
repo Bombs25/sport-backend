@@ -10,6 +10,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $this->assertDatabaseIsTestIsolationTarget();
+
         /*
          * Les tests ne doivent jamais utiliser le transport SMTP du `.env` local (risque d’échec 535 / fuite).
          * `phpunit.xml` définit déjà `MAIL_MAILER=array` ; ce filet évite les overrides d’environnement shell.
@@ -28,6 +30,41 @@ abstract class TestCase extends BaseTestCase
             ]);
             // Évite une instance de `QueueManager` résolue pendant le boot avec l’ancienne config (ex. redis).
             $this->app->forgetInstance('queue');
+        }
+    }
+
+    /**
+     * Bloque toute exécution de tests si la connexion par défaut ne pointe pas vers la base jetable
+     * attendue (`PHPUNIT_GUARD_DATABASE`, défaut `laravel` = base jetable). Évite d’écrire dans ta base principale.
+     */
+    private function assertDatabaseIsTestIsolationTarget(): void
+    {
+        if (! $this->app->environment('testing')) {
+            throw new \RuntimeException(
+                'Tests refusés : APP_ENV doit être « testing » (voir tests/bootstrap.php et phpunit.xml).',
+            );
+        }
+
+        $defaultMysql = defined('OSPORT_PHPUNIT_MYSQL_DATABASE') ? (string) OSPORT_PHPUNIT_MYSQL_DATABASE : 'laravel';
+        $allowed = (string) env('PHPUNIT_GUARD_DATABASE', $defaultMysql);
+        if ($allowed === '') {
+            $allowed = $defaultMysql;
+        }
+
+        $connectionName = (string) config('database.default');
+        $driver = (string) config("database.connections.{$connectionName}.driver");
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            throw new \RuntimeException(
+                "Tests refusés : connexion « {$connectionName} » (driver « {$driver} »). Ce projet exige mysql/mariadb pour les tests spatial.",
+            );
+        }
+
+        $database = (string) config("database.connections.{$connectionName}.database");
+        if ($database !== $allowed) {
+            throw new \RuntimeException(
+                "Tests refusés : DB actuelle « {$database} » ≠ base autorisée « {$allowed} ». ".
+                'Ne lance pas les tests contre ta base principale : exporte PHPUNIT_GUARD_DATABASE + DB_DATABASE identiques, ou utilise uniquement phpunit.xml.',
+            );
         }
     }
 }
