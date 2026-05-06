@@ -27,7 +27,7 @@ class PasswordResetOtpService
 
         $code = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
 
-        Cache::put($this->cacheKey($email), [
+        Cache::store('app_main_cache')->put($this->cacheKey($email), [
             'user_id' => (int) $userId,
             'code_hash' => hash('sha256', $code),
         ], self::OTP_TTL_SECONDS);
@@ -44,7 +44,7 @@ class PasswordResetOtpService
     {
         $email = Str::lower($email);
         $key = $this->cacheKey($email);
-        $payload = Cache::get($key);
+        $payload = Cache::store('app_main_cache')->get($key);
 
         if (! is_array($payload)
             || ! isset($payload['user_id'], $payload['code_hash'])
@@ -52,7 +52,7 @@ class PasswordResetOtpService
             return false;
         }
 
-        Cache::forget($key);
+        Cache::store('app_main_cache')->forget($key);
 
         $user = User::query()->find($payload['user_id']);
 

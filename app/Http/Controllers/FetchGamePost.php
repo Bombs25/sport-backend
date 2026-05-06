@@ -13,9 +13,7 @@ class FetchGamePost extends Controller
         $userId = (int) $request->user()->id;
         /** @var array<int, int> $viewed décodé depuis la chaîne JSON `viewed_post_ids` (FormRequest). */
         $viewed = $request->validated('viewed_post_ids') ?? [];
-        $limit = (int) ($request->validated('limit') ?? 20);
-
-        $feed = $fetchPostService->fetchMatchResultCentreInteretFeed($userId, $viewed, $limit);
+        $feed = $fetchPostService->fetchMatchResultFeedOrdered($userId, $viewed);
 
         return response()->json([
             'data' => $feed['items'],

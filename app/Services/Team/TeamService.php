@@ -4,6 +4,7 @@ namespace App\Services\Team;
 
 use App\Models\Team;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -73,7 +74,7 @@ class TeamService
     {
         $slug = $this->allocateUniqueSlug($data['name']);
 
-        return DB::transaction(function () use ($creatorId, $data, $slug): Team {
+        $team = DB::transaction(function () use ($creatorId, $data, $slug): Team {
             $teamId = DB::table('teams')->insertGetId([
                 'creator_id' => $creatorId,
                 'sport_id' => $data['sport_id'],
@@ -102,6 +103,10 @@ class TeamService
 
             return Team::query()->findOrFail($teamId);
         });
+
+        $this->cacheUserSportId($creatorId, (int) $data['sport_id']);
+
+        return $team;
     }
 
     /**
@@ -166,6 +171,7 @@ class TeamService
     {
         $this->ensureTeamIsCollective($team);
         $this->ensureUserCanJoinSport($userId, (int) $team->sport_id, (int) $team->id);
+        $this->cacheUserSportId($userId, (int) $team->sport_id);
 
         $existingMembership = DB::table('team_members')
             ->where('team_id', $team->id)
@@ -232,6 +238,7 @@ class TeamService
                     'status' => 'active',
                     'updated_at' => now(),
                 ]);
+            $this->cacheUserSportId($applicantUserId, (int) $team->sport_id);
 
             return;
         }
@@ -1030,5 +1037,20 @@ class TeamService
         if (! $isActiveCaptain) {
             throw new AuthorizationException(__('Action non autorisée pour cette équipe.'));
         }
+    }
+
+    private function cacheUserSportId(int $userId, int $sportId): void
+    {
+        $cacheKey = 'register:user:sports:'.$userId;
+        $cachedSportIds = Cache::store('app_main_cache')->get($cacheKey, []);
+        $normalizedSportIds = collect(is_array($cachedSportIds) ? $cachedSportIds : [])
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->push($sportId)
+            ->unique()
+            ->values()
+            ->all();
+
+        Cache::store('app_main_cache')->forever($cacheKey, $normalizedSportIds);
     }
 }

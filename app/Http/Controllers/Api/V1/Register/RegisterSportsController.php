@@ -7,6 +7,7 @@ use App\Http\Requests\Api\V1\Register\RegisterSportsRequest;
 use App\Services\Register\RegisterSportsService;
 use App\Services\Register\RegisterUserPayloadBuilder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Ce qu’il fait : `POST` authentifié pour enregistrer les sports choisis (`sport_ids`, multi-sélection type grille RN),
@@ -22,8 +23,10 @@ class RegisterSportsController extends Controller
         RegisterUserPayloadBuilder $payloadBuilder,
     ): JsonResponse {
         $user = $request->user();
+        $sportIds = $request->validated('sport_ids');
 
-        $service->sync($user->id, $request->validated('sport_ids'));
+        $service->sync($user->id, $sportIds);
+        Cache::store('app_main_cache')->forever('register:user:sports:'.$user->id, $sportIds);
 
         return response()->json([
             'message' => __('Vos sports ont été enregistrés.'),

@@ -19,7 +19,7 @@ class EmailVerificationOtpService
 
         $code = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
 
-        Cache::put($this->cacheKey($user->id), hash('sha256', $code), self::OTP_TTL_SECONDS);
+        Cache::store('app_main_cache')->put($this->cacheKey($user->id), hash('sha256', $code), self::OTP_TTL_SECONDS);
 
         $user->notify(new VerifyEmailOtpNotification($code));
     }
@@ -27,13 +27,13 @@ class EmailVerificationOtpService
     public function verify(User $user, string $code): bool
     {
         $key = $this->cacheKey($user->id);
-        $stored = Cache::get($key);
+        $stored = Cache::store('app_main_cache')->get($key);
 
         if ($stored === null || ! hash_equals($stored, hash('sha256', $code))) {
             return false;
         }
 
-        Cache::forget($key);
+        Cache::store('app_main_cache')->forget($key);
 
         if (! $user->hasVerifiedEmail()) {
             $user->markEmailAsVerified();

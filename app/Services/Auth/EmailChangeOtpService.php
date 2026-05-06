@@ -18,7 +18,7 @@ class EmailChangeOtpService
         $normalizedEmail = Str::lower($newEmail);
         $code = str_pad((string) random_int(0, 999_999), 6, '0', STR_PAD_LEFT);
 
-        Cache::put($this->cacheKey($user->id, $normalizedEmail), hash('sha256', $code), self::OTP_TTL_SECONDS);
+        Cache::store('app_main_cache')->put($this->cacheKey($user->id, $normalizedEmail), hash('sha256', $code), self::OTP_TTL_SECONDS);
 
         Notification::route('mail', $normalizedEmail)
             ->notify(new EmailChangeOtpNotification($code, $normalizedEmail));
@@ -28,13 +28,13 @@ class EmailChangeOtpService
     {
         $normalizedEmail = Str::lower($newEmail);
         $key = $this->cacheKey($user->id, $normalizedEmail);
-        $stored = Cache::get($key);
+        $stored = Cache::store('app_main_cache')->get($key);
 
         if ($stored === null || ! hash_equals($stored, hash('sha256', $code))) {
             return false;
         }
 
-        Cache::forget($key);
+        Cache::store('app_main_cache')->forget($key);
 
         $alreadyTaken = DB::table('users')
             ->whereRaw('lower(email) = ?', [$normalizedEmail])

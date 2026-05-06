@@ -3,6 +3,7 @@
 namespace App\Services\Follow;
 
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,6 +20,18 @@ class FollowService
                 'updated_at' => now(),
             ],
         ], ['follower_id', 'following_id'], ['status', 'updated_at']);
+
+        $cacheKey = $this->followingCacheKey($followerId);
+        $cachedFollowingIds = Cache::store('app_main_cache')->get($cacheKey, []);
+        $normalizedFollowingIds = collect(is_array($cachedFollowingIds) ? $cachedFollowingIds : [])
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->push($followingId)
+            ->unique()
+            ->values()
+            ->all();
+
+        Cache::store('app_main_cache')->forever($cacheKey, $normalizedFollowingIds);
     }
 
     public function unfollow(int $followerId, int $followingId): void
@@ -27,6 +40,17 @@ class FollowService
             ->where('follower_id', $followerId)
             ->where('following_id', $followingId)
             ->delete();
+
+        $cacheKey = $this->followingCacheKey($followerId);
+        $cachedFollowingIds = Cache::store('app_main_cache')->get($cacheKey, []);
+        $normalizedFollowingIds = collect(is_array($cachedFollowingIds) ? $cachedFollowingIds : [])
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0 && $id !== $followingId)
+            ->unique()
+            ->values()
+            ->all();
+
+        Cache::store('app_main_cache')->forever($cacheKey, $normalizedFollowingIds);
     }
 
     /**
@@ -175,5 +199,10 @@ class FollowService
         }
 
         return $payload['fid'];
+    }
+
+    private function followingCacheKey(int $followerId): string
+    {
+        return 'follow:following_ids:'.$followerId;
     }
 }

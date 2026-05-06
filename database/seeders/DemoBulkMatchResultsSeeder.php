@@ -24,6 +24,10 @@ class DemoBulkMatchResultsSeeder extends Seeder
 {
     private const TARGET_MIN = 500_000;
 
+    private const TARGET_MIN_COMMENTS = 500_000;
+
+    private const TARGET_MIN_RESPONSES = 500_000;
+
     /**
      * Nombre de match_events (donc de match_results) insérés par transaction.
      */
@@ -46,8 +50,6 @@ class DemoBulkMatchResultsSeeder extends Seeder
             if ($this->command !== null) {
                 $this->command->info('DemoBulkMatchResultsSeeder : déjà '.$current.' résultat(s) (≥ '.self::TARGET_MIN.'), rien à ajouter.');
             }
-
-            return;
         }
 
         $teamIds = DB::table('teams')->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->values()->all();
@@ -100,6 +102,8 @@ class DemoBulkMatchResultsSeeder extends Seeder
             $total = (int) DB::table('match_results')->count();
             $this->command->info('DemoBulkMatchResultsSeeder : +'.$created.' résultat(s) ; total match_results = '.$total.'.');
         }
+
+        $this->seedCommentsAndResponses($now, array_values(array_unique(array_values($captainByTeam))));
     }
 
     /**
@@ -319,5 +323,267 @@ class DemoBulkMatchResultsSeeder extends Seeder
         }
 
         return $map;
+    }
+
+    /**
+     * Ajoute au moins 500 000 commentaires + 500 000 réponses.
+     *
+     * @param  array<int, int>  $userIds
+     */
+    private function seedCommentsAndResponses(CarbonInterface $now, array $userIds): void
+    {
+        if (! DB::getSchemaBuilder()->hasTable('comments') || ! DB::getSchemaBuilder()->hasTable('response_commentaires')) {
+            return;
+        }
+
+        if ($userIds === []) {
+            if ($this->command !== null) {
+                $this->command->warn('DemoBulkMatchResultsSeeder : commentaires/réponses ignorés (match_results ou users indisponibles).');
+            }
+
+            return;
+        }
+
+        $currentComments = (int) DB::table('comments')->count();
+        $currentResponses = (int) DB::table('response_commentaires')->count();
+        $needComments = max(0, self::TARGET_MIN_COMMENTS - $currentComments);
+        $needResponses = max(0, self::TARGET_MIN_RESPONSES - $currentResponses);
+
+        if ($needComments > 0) {
+            $this->insertComments($userIds, $now, $needComments);
+        }
+
+        if ($needResponses > 0) {
+            $this->insertResponses($userIds, $now, $needResponses);
+        }
+
+        if ($this->command !== null) {
+            $this->command->info(
+                'DemoBulkMatchResultsSeeder : total comments='.(int) DB::table('comments')->count()
+                .', total response_commentaires='.(int) DB::table('response_commentaires')->count().'.'
+            );
+        }
+    }
+
+    /**
+     * @param  array<int, int>  $userIds
+     */
+    private function insertComments(array $userIds, CarbonInterface $now, int $needComments): void
+    {
+        $publicationCursor = 0;
+        $publicationBatch = [];
+        $publicationBatchIndex = 0;
+        $userCount = count($userIds);
+        $created = 0;
+
+        while ($created < $needComments) {
+            $take = min(self::CHUNK_SIZE, $needComments - $created);
+            $rows = [];
+
+            for ($k = 0; $k < $take; $k++) {
+                $i = $created + $k;
+                $publicationId = $this->nextMatchResultId($publicationCursor, $publicationBatch, $publicationBatchIndex);
+                $rows[] = [
+                    'content' => 'Bulk commentaire #'.($i + 1),
+                    'publication_id' => $publicationId,
+                    'publication_type' => 'automatic',
+                    'user_id' => $userIds[$i % $userCount],
+                    'responses_count' => 0,
+                    'likes_count' => 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            DB::table('comments')->insert($rows);
+            $created += $take;
+
+            if ($this->command !== null && ($created === $needComments || $created % self::PROGRESS_EVERY === 0)) {
+                $this->command->info('DemoBulkMatchResultsSeeder : '.$created.' / '.$needComments.' commentaires créés.');
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, int>  $userIds
+     */
+    private function insertResponses(array $userIds, CarbonInterface $now, int $needResponses): void
+    {
+        $hasAutomaticComments = DB::table('comments')
+            ->where('publication_type', 'automatic')
+            ->exists();
+
+        if (! $hasAutomaticComments) {
+            if ($this->command !== null) {
+                $this->command->warn('DemoBulkMatchResultsSeeder : aucune base de commentaires pour créer les réponses.');
+            }
+
+            return;
+        }
+
+        $commentCursor = 0;
+        $commentBatch = [];
+        $commentBatchIndex = 0;
+        $userCount = count($userIds);
+        $created = 0;
+
+        while ($created < $needResponses) {
+            $take = min(self::CHUNK_SIZE, $needResponses - $created);
+            $rows = [];
+            $responsesByComment = [];
+            $responsesByMatchResult = [];
+
+            for ($k = 0; $k < $take; $k++) {
+                $i = $created + $k;
+                $comment = $this->nextAutomaticComment($commentCursor, $commentBatch, $commentBatchIndex);
+                $commentId = $comment['id'];
+                $publicationId = $comment['publication_id'];
+
+                $rows[] = [
+                    'comment_id' => $commentId,
+                    'is_reponse_to_main_comment' => true,
+                    'response' => 'Bulk réponse #'.($i + 1),
+                    'responded_to_who' => null,
+                    'users_id' => $userIds[$i % $userCount],
+                    'likes_count' => 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+
+                $responsesByComment[$commentId] = ($responsesByComment[$commentId] ?? 0) + 1;
+                $responsesByMatchResult[$publicationId] = ($responsesByMatchResult[$publicationId] ?? 0) + 1;
+            }
+
+            DB::transaction(function () use ($rows, $responsesByComment, $responsesByMatchResult): void {
+                DB::table('response_commentaires')->insert($rows);
+
+                $this->incrementGroupedCounter('comments', 'id', 'responses_count', $responsesByComment);
+                $this->incrementGroupedCounter('match_results', 'id', 'total_comments', $responsesByMatchResult);
+            });
+
+            $created += $take;
+
+            if ($this->command !== null && ($created === $needResponses || $created % self::PROGRESS_EVERY === 0)) {
+                $this->command->info('DemoBulkMatchResultsSeeder : '.$created.' / '.$needResponses.' réponses créées.');
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, int>  $increments
+     */
+    private function incrementGroupedCounter(string $table, string $idColumn, string $counterColumn, array $increments): void
+    {
+        if ($increments === []) {
+            return;
+        }
+
+        $ids = array_keys($increments);
+        $bindings = [];
+        $caseSql = 'CASE '.$idColumn.' ';
+
+        foreach ($increments as $id => $amount) {
+            $caseSql .= 'WHEN ? THEN ? ';
+            $bindings[] = (int) $id;
+            $bindings[] = (int) $amount;
+        }
+
+        $caseSql .= 'ELSE 0 END';
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        foreach ($ids as $id) {
+            $bindings[] = (int) $id;
+        }
+
+        DB::update(
+            "UPDATE {$table} SET {$counterColumn} = {$counterColumn} + {$caseSql} WHERE {$idColumn} IN ({$placeholders})",
+            $bindings
+        );
+    }
+
+    /**
+     * @param  array<int, int>  $publicationBatch
+     */
+    private function nextMatchResultId(int &$publicationCursor, array &$publicationBatch, int &$publicationBatchIndex): int
+    {
+        if (! isset($publicationBatch[$publicationBatchIndex])) {
+            $publicationBatch = DB::table('match_results')
+                ->where('id', '>', $publicationCursor)
+                ->orderBy('id')
+                ->limit(self::CHUNK_SIZE)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->values()
+                ->all();
+
+            if ($publicationBatch === []) {
+                $publicationCursor = 0;
+                $publicationBatch = DB::table('match_results')
+                    ->orderBy('id')
+                    ->limit(self::CHUNK_SIZE)
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->values()
+                    ->all();
+            }
+
+            $publicationBatchIndex = 0;
+        }
+
+        if ($publicationBatch === []) {
+            throw new \RuntimeException('Aucun match_result disponible pour créer des commentaires.');
+        }
+
+        $id = $publicationBatch[$publicationBatchIndex];
+        $publicationCursor = $id;
+        $publicationBatchIndex++;
+
+        return $id;
+    }
+
+    /**
+     * @param  array<int, array{id:int,publication_id:int}>  $commentBatch
+     * @return array{id:int,publication_id:int}
+     */
+    private function nextAutomaticComment(int &$commentCursor, array &$commentBatch, int &$commentBatchIndex): array
+    {
+        if (! isset($commentBatch[$commentBatchIndex])) {
+            $commentBatch = DB::table('comments')
+                ->where('publication_type', 'automatic')
+                ->where('id', '>', $commentCursor)
+                ->orderBy('id')
+                ->limit(self::CHUNK_SIZE)
+                ->get(['id', 'publication_id'])
+                ->map(static fn ($row): array => [
+                    'id' => (int) $row->id,
+                    'publication_id' => (int) $row->publication_id,
+                ])
+                ->all();
+
+            if ($commentBatch === []) {
+                $commentCursor = 0;
+                $commentBatch = DB::table('comments')
+                    ->where('publication_type', 'automatic')
+                    ->orderBy('id')
+                    ->limit(self::CHUNK_SIZE)
+                    ->get(['id', 'publication_id'])
+                    ->map(static fn ($row): array => [
+                        'id' => (int) $row->id,
+                        'publication_id' => (int) $row->publication_id,
+                    ])
+                    ->all();
+            }
+
+            $commentBatchIndex = 0;
+        }
+
+        if ($commentBatch === []) {
+            throw new \RuntimeException('Aucun commentaire automatique disponible pour créer des réponses.');
+        }
+
+        $comment = $commentBatch[$commentBatchIndex];
+        $commentCursor = $comment['id'];
+        $commentBatchIndex++;
+
+        return $comment;
     }
 }
