@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\V1\Teams\TeamMatchResultStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamMemberDestroyController;
 use App\Http\Controllers\Api\V1\Teams\TeamMembershipStatusShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamProfileShowController;
+use App\Http\Controllers\Api\V1\Teams\TeamRankingListController;
+use App\Http\Controllers\Api\V1\Teams\TeamRankingYearsListController;
 use App\Http\Controllers\Api\V1\Teams\TeamShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamUpdateController;
@@ -54,6 +56,12 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::delete('teams/{team_id}/members/{member_user_id}', TeamMemberDestroyController::class)->middleware('throttle:auth-team-write');
     // Demande de match entre deux équipes du même sport.
     Route::post('teams/{team_id}/match-requests', TeamMatchRequestStoreController::class)->middleware('throttle:auth-team-write');
+
+    // ////////// page classement equipes ////////////
+    // Classement des equipes pour un sport et une annee (saison resolue par SeasonStrategy bindee).
+    Route::get('teams/rankings', TeamRankingListController::class)->middleware('throttle:auth-team-read');
+    // Annees disponibles pour le dropdown classement d'un sport.
+    Route::get('teams/rankings/years', TeamRankingYearsListController::class)->middleware('throttle:auth-team-read');
 
     // ////////// page match request ////////////
     // Liste des demandes de match (reçu/envoyé), paginée.

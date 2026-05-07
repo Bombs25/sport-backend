@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\Stats\SeasonStrategy;
+use App\Contracts\Stats\StatsRepository;
+use App\Repositories\Stats\QueryBuilderStatsRepository;
+use App\Services\Stats\AnnualSeasonStrategy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -19,7 +23,11 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Injection via interfaces:
+        // - SeasonStrategy pointe vers la strategie de saison active (annuelle pour le moment).
+        // - StatsRepository pointe vers l'implementation Query Builder pour centraliser l'acces stats.
+        $this->app->scoped(SeasonStrategy::class, AnnualSeasonStrategy::class);
+        $this->app->scoped(StatsRepository::class, QueryBuilderStatsRepository::class);
     }
 
     public function boot(): void

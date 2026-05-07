@@ -2,6 +2,7 @@
 
 namespace App\Services\Team;
 
+use App\Jobs\Team\ApplyValidatedMatchResultStatsJob;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -273,6 +274,13 @@ class MatchResultService
                     'status' => 'finished',
                     'updated_at' => $now,
                 ]);
+
+            ApplyValidatedMatchResultStatsJob::dispatch(
+                $homeTeamId,
+                $awayTeamId,
+                (int) $result->home_score,
+                (int) $result->away_score,
+            )->afterCommit();
         });
     }
 

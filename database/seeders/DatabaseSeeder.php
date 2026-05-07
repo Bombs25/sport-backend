@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             DemoMatchCalendarSeeder::class,
             DemoMatchSocialInteractionsSeeder::class,
             DemoBulkMatchResultsSeeder::class,
+            StatsFromMatchResultsSeeder::class,
         ]);
 
         if ($this->command !== null) {

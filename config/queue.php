@@ -85,6 +85,14 @@ return [
                 'after_commit' => false,
             ],
         },
+        'app_main_cache' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_APP_MAIN_CACHE_QUEUE_CONNECTION', 'app_main_cache'),
+            'queue' => env('REDIS_APP_MAIN_CACHE_QUEUE', 'default'),
+            'retry_after' => (int) env('REDIS_APP_MAIN_CACHE_QUEUE_RETRY_AFTER', 90),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
 
         'deferred' => [
             'driver' => 'deferred',
