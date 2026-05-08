@@ -32,7 +32,7 @@ class TeamRankingListController extends Controller
             ? (int) $validated['year']
             : (int) CarbonImmutable::now()->year;
 
-        $referenceDate = CarbonImmutable::create($year, 6, 15, 0, 0, 0);
+        $referenceDate = CarbonImmutable::create($year, 1, 1, 0, 0, 0);
         $seasonWindow = $seasonStrategy->resolveWindowForDate($referenceDate);
 
         $rankings = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page, $perPage);

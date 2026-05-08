@@ -40,4 +40,21 @@ interface StatsRepository
      * @return array<int, int>
      */
     public function loadAvailableRankingYears(int $sportId): array;
+
+    /**
+     * Agrège les lignes stats d'une équipe sur la fenêtre saison (sums des compteurs).
+     *
+     * @return array{
+     *     played: int,
+     *     won: int,
+     *     lost: int,
+     *     draw: int,
+     *     point_count: int
+     * }
+     */
+    public function loadTeamSeasonStats(
+        int $teamId,
+        int $sportId,
+        SeasonWindow $seasonWindow,
+    ): array;
 }

@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use App\Contracts\Stats\SeasonStrategy;
 use App\Contracts\Stats\StatsRepository;
+use App\Contracts\Teams\TeamMatchReadRepository;
 use App\Repositories\Stats\QueryBuilderStatsRepository;
+use App\Repositories\Teams\QueryBuilderTeamMatchReadRepository;
 use App\Services\Stats\AnnualSeasonStrategy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -26,8 +28,10 @@ class AppServiceProvider extends ServiceProvider
         // Injection via interfaces:
         // - SeasonStrategy pointe vers la strategie de saison active (annuelle pour le moment).
         // - StatsRepository pointe vers l'implementation Query Builder pour centraliser l'acces stats.
+        // - TeamMatchReadRepository : lectures match_events / match_results en Query Builder.
         $this->app->scoped(SeasonStrategy::class, AnnualSeasonStrategy::class);
         $this->app->scoped(StatsRepository::class, QueryBuilderStatsRepository::class);
+        $this->app->scoped(TeamMatchReadRepository::class, QueryBuilderTeamMatchReadRepository::class);
     }
 
     public function boot(): void

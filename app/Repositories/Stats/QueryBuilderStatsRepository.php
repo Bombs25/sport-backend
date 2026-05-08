@@ -174,4 +174,47 @@ class QueryBuilderStatsRepository implements StatsRepository
             ->values()
             ->all();
     }
+
+    /**
+     * @return array{
+     *     played: int,
+     *     won: int,
+     *     lost: int,
+     *     draw: int,
+     *     point_count: int
+     * }
+     */
+    public function loadTeamSeasonStats(
+        int $teamId,
+        int $sportId,
+        SeasonWindow $seasonWindow,
+    ): array {
+        $seasonStartAt = $seasonWindow->startDate->startOfDay()->toDateTimeString();
+        $seasonEndAt = $seasonWindow->endDate->endOfDay()->toDateTimeString();
+
+        $row = DB::table('stats')
+            ->where('team_id', $teamId)
+            ->where('sport_id', $sportId)
+            ->whereBetween('created_at', [$seasonStartAt, $seasonEndAt])
+            ->selectRaw(
+                'COALESCE(SUM(victory_count), 0) as won_total, '.
+                'COALESCE(SUM(draw_count), 0) as draw_total, '.
+                'COALESCE(SUM(defeat_count), 0) as lost_total, '.
+                'COALESCE(SUM(point_count), 0) as points_total',
+            )
+            ->first();
+
+        $won = (int) ($row?->won_total ?? 0);
+        $draw = (int) ($row?->draw_total ?? 0);
+        $lost = (int) ($row?->lost_total ?? 0);
+        $points = (int) ($row?->points_total ?? 0);
+
+        return [
+            'played' => $won + $draw + $lost,
+            'won' => $won,
+            'lost' => $lost,
+            'draw' => $draw,
+            'point_count' => $points,
+        ];
+    }
 }

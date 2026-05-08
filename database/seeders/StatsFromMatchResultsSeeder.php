@@ -32,6 +32,7 @@ class StatsFromMatchResultsSeeder extends Seeder
             ->join('sports', 'sports.id', '=', 'home_teams.sport_id')
             ->where('match_results.status', 'validated')
             ->select([
+                'match_results.id as chunk_id',
                 'match_results.home_score',
                 'match_results.away_score',
                 'match_results.validated_at',
@@ -67,7 +68,7 @@ class StatsFromMatchResultsSeeder extends Seeder
                     $this->accumulateRow($rowsByKey, $homeTeamId, $sportId, $seasonWindow, $homeStats);
                     $this->accumulateRow($rowsByKey, $awayTeamId, $sportId, $seasonWindow, $awayStats);
                 }
-            }, 'match_results.id');
+            }, 'match_results.id', 'chunk_id');
 
         if ($rowsByKey === []) {
             return;

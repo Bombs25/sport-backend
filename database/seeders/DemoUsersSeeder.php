@@ -51,7 +51,8 @@ class DemoUsersSeeder extends Seeder
 
     public function run(): void
     {
-        $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 1_000_000)));
+        // $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 1_000_000)));
+        $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 15_000)));
         $now = now();
         $passwordHash = Hash::make('password');
 

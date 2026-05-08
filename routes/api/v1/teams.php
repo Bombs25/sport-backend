@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Teams\TeamDestroyController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationDecisionController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationPendingListController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationStoreController;
+use App\Http\Controllers\Api\V1\Teams\TeamLatestMatchShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamListController;
 use App\Http\Controllers\Api\V1\Teams\TeamMatchDisputeStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamMatchRequestDecisionController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Api\V1\Teams\TeamMembershipStatusShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamProfileShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamRankingListController;
 use App\Http\Controllers\Api\V1\Teams\TeamRankingYearsListController;
+use App\Http\Controllers\Api\V1\Teams\TeamSeasonStatsShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamUpdateController;
@@ -50,6 +52,10 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('teams/{team_id}/membership', TeamMembershipStatusShowController::class)->middleware('throttle:auth-team-read');
     // Données profil équipe (nom, ville, sport/type, membres + total).
     Route::get('teams/{team_id}/profile', TeamProfileShowController::class)->middleware('throttle:auth-team-read');
+    // Stats saison agrégées (played / won / lost / draw / points), année optionnelle (défaut = année courante).
+    Route::get('teams/{team_id}/season-stats', TeamSeasonStatsShowController::class)->middleware('throttle:auth-team-read');
+    // Dernier match à score validé (noms, logos, scores, issue pour l'équipe consultée).
+    Route::get('teams/{team_id}/latest-match', TeamLatestMatchShowController::class)->middleware('throttle:auth-team-read');
     // Demande d'intégration à une équipe (utilisateur connecté).
     Route::post('teams/{team_id}/integrations', TeamIntegrationStoreController::class)->middleware('throttle:auth-team-write');
     // Sortie d'équipe (self) ou suppression d'un membre (créateur/captain actif).
