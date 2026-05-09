@@ -2,14 +2,19 @@
 
 namespace App\Providers;
 
+use App\Contracts\Files\ImageProcessingInterface;
 use App\Contracts\Stats\SeasonStrategy;
 use App\Contracts\Stats\StatsRepository;
 use App\Contracts\Teams\TeamMatchReadRepository;
+use App\Events\ImageProcessingEvent;
+use App\Listeners\ImageProcessingListener;
 use App\Repositories\Stats\QueryBuilderStatsRepository;
 use App\Repositories\Teams\QueryBuilderTeamMatchReadRepository;
+use App\Services\Files\ImageProcessing;
 use App\Services\Stats\AnnualSeasonStrategy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -32,10 +37,13 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(SeasonStrategy::class, AnnualSeasonStrategy::class);
         $this->app->scoped(StatsRepository::class, QueryBuilderStatsRepository::class);
         $this->app->scoped(TeamMatchReadRepository::class, QueryBuilderTeamMatchReadRepository::class);
+        $this->app->scoped(ImageProcessingInterface::class, ImageProcessing::class);
     }
 
     public function boot(): void
     {
+        Event::listen(ImageProcessingEvent::class, ImageProcessingListener::class);
+
         RateLimiter::for('auth-login', function (Request $request) {
             $email = Str::lower((string) $request->input('email', ''));
 

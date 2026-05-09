@@ -15,3 +15,11 @@ Route::get('/', function () {
 Route::get('/email/verify/{id}/{hash}', VerifyEmailFromSignedUrlController::class)
     ->middleware(['signed', 'throttle:6,1'])
     ->name('verification.verify');
+
+/*
+| Page de test multipart + Sanctum stateful (local uniquement). Doit passer par le groupe `web`
+| (session + CSRF) pour que le meta token et les cookies de session soient cohérents avec l’API.
+*/
+if (app()->environment('local')) {
+    Route::view('/dev/api-test/create-team', 'dev.api-test-create-team');
+}
