@@ -35,6 +35,8 @@ class ImageProcessingListener
 
         /** @var FilesystemAdapter $disk */
         $disk = Storage::disk();
+        $batchKey = $event->uniqueKey;
+
         $seenContentHashes = [];
         $storedPaths = [];
 
@@ -56,23 +58,23 @@ class ImageProcessingListener
 
             $extension = strtolower((string) ($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin'));
             $filename = "{$contentHash}.{$extension}";
+            $relativePath = "{$batchKey}/{$filename}";
 
-            if (! $disk->exists($filename)) {
+            if (! $disk->exists($relativePath)) {
                 $contents = file_get_contents($path);
                 if ($contents === false) {
                     continue;
                 }
-                $disk->put($filename, $contents);
+                $disk->put($relativePath, $contents);
             }
 
-            $storedPaths[] = $filename;
+            $storedPaths[] = $relativePath;
         }
 
         if ($storedPaths === []) {
             return;
         }
 
-        $batchKey = $event->uniqueKey;
         $user = $event->user;
         $userId = (int) $user->id;
         $variant = $event->variant;
@@ -88,8 +90,23 @@ class ImageProcessingListener
         ])
             ->before(function (Batch $batch) {
                 // The batch has been created but no jobs have been added...
-            })->progress(function (Batch $batch) {
-                // A single job has completed successfully...
+            })->progress(function (Batch $batch) use ($batchKey, $userId) {
+                $payload = self::batchProgressPayload($batch);
+
+                Cache::put(
+                    ImagePipelineResultCache::progressKey($batchKey, $userId),
+                    $payload,
+                    now()->addMinutes(30),
+                );
+
+                Log::info('Image processing batch progress.', [
+                    'batch_id' => $batch->id,
+                    'name' => $batch->name,
+                    'progress_bar' => $payload['progress_bar'],
+                    'percent' => $payload['percent'],
+                    'processed_jobs' => $payload['processed_jobs'],
+                    'total_jobs' => $payload['total_jobs'],
+                ]);
             })->then(function (Batch $batch) {
                 // Log::info('Image processing batch completed successfully.', [
                 //     'batch_id' => $batch->id,
@@ -104,6 +121,15 @@ class ImageProcessingListener
                     'error' => $e->getMessage(),
                 ]);
             })->finally(function (Batch $batch) use ($batchKey, $userId, $variant) {
+                $defaultDisk = Storage::disk();
+                $suffix = (string) $variant->value;
+
+                if ($defaultDisk->exists($batchKey)) {
+                    $defaultDisk->deleteDirectory($batchKey);
+                }
+
+                Cache::forget("image-pipeline:compressed:{$batchKey}:{$userId}:{$suffix}");
+
                 $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId);
                 $convertKey = ImagePipelineResultCache::convertKey($batchKey, $userId, $variant);
 
@@ -121,11 +147,45 @@ class ImageProcessingListener
                     'convert_paths' => is_array($convertPaths) ? $convertPaths : $convertJson,
                 ]);
 
+                Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId));
                 Cache::forget($blurKey);
                 Cache::forget($convertKey);
             })
             ->name("image-processing:{$batchKey}")
             ->onQueue(ImageProcessingQueue::NAME)
             ->dispatch();
+    }
+
+    /**
+     * @return array{
+     *     batch_id: string,
+     *     percent: int,
+     *     processed_jobs: int,
+     *     total_jobs: int,
+     *     pending_jobs: int,
+     *     failed_jobs: int,
+     *     progress_bar: string
+     * }
+     */
+    private static function batchProgressPayload(Batch $batch): array
+    {
+        $total = max(1, $batch->totalJobs);
+        $processed = $batch->totalJobs - $batch->pendingJobs;
+        $percent = (int) min(100, max(0, (int) floor((100 * $processed) / $total)));
+
+        $width = 24;
+        $filled = (int) round($width * $percent / 100);
+        $filled = min($width, max(0, $filled));
+        $bar = '['.str_repeat('█', $filled).str_repeat('░', $width - $filled)."] {$percent}%";
+
+        return [
+            'batch_id' => $batch->id,
+            'percent' => $percent,
+            'processed_jobs' => $processed,
+            'total_jobs' => $batch->totalJobs,
+            'pending_jobs' => $batch->pendingJobs,
+            'failed_jobs' => $batch->failedJobs,
+            'progress_bar' => $bar,
+        ];
     }
 }

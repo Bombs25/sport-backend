@@ -4,8 +4,8 @@ namespace App\Services\Files;
 
 use App\Contracts\Files\ImageProcessingInterface;
 use App\Enums\ImageVariantLongEdge;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Intervention\Image\Encoders\WebpEncoder;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\ImageInterface;
@@ -18,7 +18,7 @@ use Throwable;
  * Pipeline type apps sociales :
  * - correction EXIF
  * - une seule sortie par fichier, pilotée par {@see ImageVariantLongEdge} (1080 px flux ou 360 px carré)
- * - WebP ; étape « convert » : finalisation sur le disque `public` / `temps/`
+ * - WebP ; étape « convert » : fichiers plats sous `public/temps/` (`{uniqueKey}__{stem}.webp`, pas de sous-dossier)
  */
 class ImageProcessing implements ImageProcessingInterface
 {
@@ -76,15 +76,15 @@ class ImageProcessing implements ImageProcessingInterface
                 throw new RuntimeException("Image introuvable pour compression: {$path}");
             }
 
-            $stem = pathinfo($path, PATHINFO_FILENAME);
-            $out[] = $this->writeSingleVariant($absolute, $stem, $variant);
+            $out[] = $this->writeSingleVariant($absolute, $path, $variant);
         }
 
         return $out;
     }
 
-    private function writeSingleVariant(string $absolute, string $stem, ImageVariantLongEdge $variant): string
+    private function writeSingleVariant(string $absolute, string $relativeOriginal, ImageVariantLongEdge $variant): string
     {
+        $stem = pathinfo($relativeOriginal, PATHINFO_FILENAME);
         $px = $variant->value;
         $suffix = (string) $px;
 
@@ -99,7 +99,11 @@ class ImageProcessing implements ImageProcessingInterface
             $quality = 72;
         }
 
-        $relative = "variants/{$stem}_{$suffix}.webp";
+        $batchDir = trim(str_replace('\\', '/', dirname($relativeOriginal)), '/');
+        $relative = ($batchDir === '' || $batchDir === '.')
+            ? "variants/{$stem}_{$suffix}.webp"
+            : "{$batchDir}/variants/{$stem}_{$suffix}.webp";
+
         $encoded = $image->encode(new WebpEncoder(quality: $quality));
         Storage::disk()->put($relative, $encoded->toString());
 
@@ -108,7 +112,7 @@ class ImageProcessing implements ImageProcessingInterface
 
     /**
      * @param  list<string>  $paths  sortie de {@see compress()} (WebP intermédiaires sur le disque défaut)
-     * @return string JSON list<string> chemins relatifs au disque `public` (`temps/…`, suffixes _1080 / _360)
+     * @return string JSON list<string> chemins relatifs au disque `public` (`temps/{uniqueKey}__{stem}.webp`)
      */
     public function convert(array $paths): string
     {
@@ -133,7 +137,15 @@ class ImageProcessing implements ImageProcessingInterface
                 strip: true,
             ));
 
-            $relative = "temps/{$stem}.webp";
+            $normalized = str_replace('\\', '/', $path);
+            if (Str::contains($normalized, '/variants/')) {
+                $batchRoot = Str::before($normalized, '/variants/');
+                $safeBatch = str_replace(['/', '\\'], '_', $batchRoot);
+                $relative = "temps/{$safeBatch}__{$stem}.webp";
+            } else {
+                $relative = "temps/{$stem}.webp";
+            }
+
             $public->put($relative, $encoded->toString());
             $finalPaths[] = $relative;
         }

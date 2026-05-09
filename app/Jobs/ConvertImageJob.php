@@ -15,7 +15,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
-class ConvertImageJob implements ShouldBeUnique, ShouldQueue
+final class ConvertImageJob implements ShouldBeUnique, ShouldQueue
 {
     use Batchable, Dispatchable, Queueable;
 

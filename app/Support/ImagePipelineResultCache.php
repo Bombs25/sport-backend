@@ -7,13 +7,18 @@ use DateInterval;
 use DateTimeInterface;
 
 /**
- * Clés / TTL pour les sorties finales du lot (blurhash, JSON convert), lues dans le `finally` du batch.
+ * Clés / TTL : progression du lot, résultats blurhash / convert (`finally`).
  */
 final class ImagePipelineResultCache
 {
     public static function ttl(): DateTimeInterface|DateInterval
     {
         return now()->addHour();
+    }
+
+    public static function progressKey(string $uniqueKey, int $userId): string
+    {
+        return "image-pipeline:progress:{$uniqueKey}:{$userId}";
     }
 
     public static function blurhashKey(string $uniqueKey, int $userId): string
