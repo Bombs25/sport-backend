@@ -12,31 +12,33 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
- * Reçoit un multipart `files[]` et déclenche l’événement ; la validation est faite dans {@see ImageProcessingListener}.
+ * Endpoint générique : multipart {@code files[]} → {@see ImageProcessingEvent} avec {@code uniqueKey} éphémère ;
+ * la validation raster est dans {@see ImageProcessingListener}.
  */
 class ImageProcessingStoreController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
-    {
-        $request->validate([
-            'variant_long_edge' => ['nullable', Rule::enum(ImageVariantLongEdge::class)],
-        ]);
+    // public function __invoke(Request $request): JsonResponse
+    // {
+    //     $request->validate([
+    //         'variant_long_edge' => ['nullable', Rule::enum(ImageVariantLongEdge::class)],
+    //     ]);
 
-        $files = $request->file('files', []);
-        if ($files instanceof UploadedFile) {
-            $files = [$files];
-        }
+    //     $files = $request->file('files', []);
+    //     if ($files instanceof UploadedFile) {
+    //         $files = [$files];
+    //     }
 
-        ImageProcessingEvent::dispatch(
-            $request->user(),
-            is_array($files) ? $files : [],
-            'images-'.Str::uuid()->toString(),
-            null,
-            $request->enum('variant_long_edge', ImageVariantLongEdge::class) ?? ImageVariantLongEdge::Feed,
-        );
+    //     ImageProcessingEvent::dispatch(
+    //         $request->user(),
+    //         is_array($files) ? $files : [],
+    //         'images-'.Str::uuid()->toString(),
+    //         contextId: null,
+    //         variant: $request->enum('variant_long_edge', ImageVariantLongEdge::class) ?? ImageVariantLongEdge::Feed,
+    //         type: 'images',
+    //     );
 
-        return response()->json([
-            'message' => __('Traitement des images lancé.'),
-        ], JsonResponse::HTTP_ACCEPTED);
-    }
+    //     return response()->json([
+    //         'message' => __('Traitement des images lancé.'),
+    //     ], JsonResponse::HTTP_ACCEPTED);
+    // }
 }

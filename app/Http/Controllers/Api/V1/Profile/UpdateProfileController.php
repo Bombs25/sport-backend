@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Profile;
 
+use App\Enums\ImageVariantLongEdge;
+use App\Events\ImageProcessingEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Profile\UpdateProfileRequest;
 use App\Services\Profile\UpdateProfileService;
@@ -22,7 +24,22 @@ class UpdateProfileController extends Controller
     ): JsonResponse {
         $user = $request->user();
 
-        $service->update($user->id, $request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('avatar_url')) {
+            unset($data['avatar_url']);
+        }
+        $service->update($user->id, $data);
+
+        ImageProcessingEvent::dispatch(
+            $request->user(),
+            [
+                $request->file('avatar_url'),
+            ],
+            'profile-'.$user->id,
+            contextId: $user->id,
+            variant: ImageVariantLongEdge::GridThumb,
+            type: 'profile',
+        );
 
         return response()->json([
             'user' => $payloadBuilder->build($user->fresh()),

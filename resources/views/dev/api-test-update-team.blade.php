@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Test POST /api/v1/auth/teams</title>
+    <title>Test PATCH /api/v1/auth/teams/{team_id}</title>
     <style>
         :root { font-family: system-ui, sans-serif; line-height: 1.5; }
         body { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
@@ -27,56 +27,61 @@
     </style>
 </head>
 <body>
-    <h1>Créer une équipe (même requête que l’API)</h1>
+    <h1>Mettre à jour une équipe (même requête que l’API)</h1>
     <p class="hint">
-        Envoie un <code>multipart/form-data</code> vers <code>/api/v1/auth/teams</code> (même origine que cette page) avec le header
-        <code>Authorization: Bearer …</code>. Avec Sanctum <code>statefulApi()</code>, le POST passe par la vérif CSRF : le script appelle d’abord <code>/sanctum/csrf-cookie</code>, puis envoie <code>X-XSRF-TOKEN</code> (cookie <code>XSRF-TOKEN</code>). Les URLs en dur via <code>APP_URL</code> (ex. <code>localhost</code> alors que tu ouvres <code>127.0.0.1</code>) cassent les cookies — d’où des chemins relatifs ici.
+        Envoie un <code>multipart/form-data</code> en <code>PATCH</code> vers <code>/api/v1/auth/teams/{team_id}</code>
+        via <code>POST + _method=PATCH</code> (même origine).
+        Sanctum stateful : <code>/sanctum/csrf-cookie</code> puis <code>X-XSRF-TOKEN</code>, comme la page « create-team ».
+        Champs texte optionnels ; fichiers optionnels (pipeline image si présents).
     </p>
 
     <form id="form">
         <label for="bearer">Token Sanctum (sans le préfixe « Bearer »)</label>
         <input type="text" id="bearer" name="bearer" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="1|xxxxxxxx…" required>
 
-        <label for="name">name</label>
-        <input type="text" id="name" name="name" value="Les Lions de Paris" required>
+        <label for="team_id">team_id (dans l’URL)</label>
+        <input type="number" id="team_id" name="team_id" value="1" min="1" required>
 
-        <label for="sport_id">sport_id</label>
-        <input type="number" id="sport_id" name="sport_id" value="1" required>
+        <label for="name">name (optionnel)</label>
+        <input type="text" id="name" name="name" placeholder="Laisser vide pour ne pas envoyer">
 
-        <label for="description">description</label>
-        <textarea id="description" name="description" rows="2">Entraînements le mardi soir.</textarea>
+        <label for="sport_id">sport_id (optionnel)</label>
+        <input type="number" id="sport_id" name="sport_id" placeholder="ex. 1">
 
-        <label for="hq_city">hq_city</label>
-        <input type="text" id="hq_city" name="hq_city" value="Paris">
+        <label for="description">description (optionnel)</label>
+        <textarea id="description" name="description" rows="2" placeholder="Laisser vide pour ne pas envoyer"></textarea>
 
-        <label for="hq_latitude">hq_latitude</label>
-        <input type="text" id="hq_latitude" name="hq_latitude" value="48.8566">
+        <label for="hq_city">hq_city (optionnel)</label>
+        <input type="text" id="hq_city" name="hq_city" placeholder="Paris">
 
-        <label for="hq_longitude">hq_longitude</label>
-        <input type="text" id="hq_longitude" name="hq_longitude" value="2.3522">
+        <label for="hq_latitude">hq_latitude (optionnel)</label>
+        <input type="text" id="hq_latitude" name="hq_latitude" placeholder="48.8566">
 
-        <label for="cover_image_url">cover_image_url (fichier)</label>
-        <input type="file" id="cover_image_url" name="cover_image_url" accept="image/jpeg,image/png,image/gif,image/webp" required>
+        <label for="hq_longitude">hq_longitude (optionnel)</label>
+        <input type="text" id="hq_longitude" name="hq_longitude" placeholder="2.3522">
 
-        <label for="logo_url">logo_url (fichier)</label>
-        <input type="file" id="logo_url" name="logo_url" accept="image/jpeg,image/png,image/gif,image/webp" required>
+        <label for="cover_image_url">cover_image_url (fichier, optionnel)</label>
+        <input type="file" id="cover_image_url" name="cover_image_url" accept="image/jpeg,image/png,image/gif,image/webp">
 
-        <label for="competition_type">competition_type</label>
+        <label for="logo_url">logo_url (fichier, optionnel)</label>
+        <input type="file" id="logo_url" name="logo_url" accept="image/jpeg,image/png,image/gif,image/webp">
+
+        <label for="competition_type">competition_type (optionnel)</label>
         <select id="competition_type" name="competition_type">
-            <option value="">(vide)</option>
-            <option value="leisure" selected>leisure</option>
+            <option value="" selected>(ne pas envoyer)</option>
+            <option value="leisure">leisure</option>
             <option value="competitive">competitive</option>
         </select>
 
-        <label for="skill_level">skill_level</label>
+        <label for="skill_level">skill_level (optionnel)</label>
         <select id="skill_level" name="skill_level">
-            <option value="">(vide)</option>
+            <option value="" selected>(ne pas envoyer)</option>
             <option value="beginner">beginner</option>
-            <option value="intermediate" selected>intermediate</option>
+            <option value="intermediate">intermediate</option>
             <option value="expert">expert</option>
         </select>
 
-        <button type="submit">Envoyer POST</button>
+        <button type="submit">Envoyer PATCH (POST + _method)</button>
     </form>
 
     <pre id="out">Réponse…</pre>
@@ -99,7 +104,6 @@
         }
 
         async function ensureSanctumCsrfCookie() {
-            /* Chemin relatif = même schéma/hôte/port que la page (évite APP_URL ≠ barre d’adresse). */
             const res = await fetch('/sanctum/csrf-cookie', {
                 method: 'GET',
                 credentials: 'same-origin',
@@ -122,38 +126,50 @@
             }
 
             const xsrf = xsrfTokenFromCookie();
-
             const token = document.getElementById('bearer').value.trim();
-            const fd = new FormData();
+            const teamId = document.getElementById('team_id').value.trim();
+            if (! teamId) {
+                out.textContent = 'team_id requis.';
+                return;
+            }
 
-            /* Le cookie XSRF-TOKEN est chiffré : ne pas l’envoyer comme _token (plain). Après
-               sanctum/csrf-cookie, on s’appuie sur X-XSRF-TOKEN ; sinon repli meta + _token. */
+            const fd = new FormData();
+            fd.append('_method', 'PATCH');
             if (! xsrf && csrfMeta) {
                 fd.append('_token', csrfMeta);
             }
 
-            fd.append('name', document.getElementById('name').value);
-            fd.append('sport_id', document.getElementById('sport_id').value);
+            const name = document.getElementById('name').value.trim();
+            if (name) fd.append('name', name);
+
+            const sportId = document.getElementById('sport_id').value.trim();
+            if (sportId) fd.append('sport_id', sportId);
+
             const desc = document.getElementById('description').value;
-            if (desc) fd.append('description', desc);
-            const city = document.getElementById('hq_city').value;
+            if (desc.trim()) fd.append('description', desc);
+
+            const city = document.getElementById('hq_city').value.trim();
             if (city) fd.append('hq_city', city);
-            const lat = document.getElementById('hq_latitude').value;
+
+            const lat = document.getElementById('hq_latitude').value.trim();
             if (lat) fd.append('hq_latitude', lat);
-            const lng = document.getElementById('hq_longitude').value;
+
+            const lng = document.getElementById('hq_longitude').value.trim();
             if (lng) fd.append('hq_longitude', lng);
 
             const cover = document.getElementById('cover_image_url').files[0];
-            const logo = document.getElementById('logo_url').files[0];
             if (cover) fd.append('cover_image_url', cover, cover.name);
+
+            const logo = document.getElementById('logo_url').files[0];
             if (logo) fd.append('logo_url', logo, logo.name);
 
             const ct = document.getElementById('competition_type').value;
             if (ct) fd.append('competition_type', ct);
+
             const sl = document.getElementById('skill_level').value;
             if (sl) fd.append('skill_level', sl);
 
-            const url = '/api/v1/auth/teams';
+            const url = '/api/v1/auth/teams/' + encodeURIComponent(teamId);
             try {
                 const headers = {
                     'Authorization': 'Bearer ' + token,

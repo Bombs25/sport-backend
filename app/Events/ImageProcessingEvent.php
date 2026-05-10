@@ -15,15 +15,17 @@ class ImageProcessingEvent
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
-     * @param  array<int, UploadedFile>  $files
-     * @param  ?int  $teamId  si défini, le listener met à jour `teams.cover_image_url` / `logo_url` (originaux stockés)
+     * @param  array<int, UploadedFile>  $files  images raster validées côté listener
+     * @param  string  $uniqueKey  préfixe métier unique pour staging, cache et noms sous {@code temps/} (ex. {@code team-{id}}, {@code images-{uuid}}, {@code post-{id}})
+     * @param  ?int  $contextId  identifiant optionnel pour écouteurs métier (ex. {@code teams.id} après création) ; le pipeline image ne l’utilise pas directement
      */
     public function __construct(
         public User $user,
         public array $files,
         public string $uniqueKey,
-        public ?int $teamId = null,
+        public ?int $contextId = null,
         public ImageVariantLongEdge $variant = ImageVariantLongEdge::Feed,
+        public string $type = 'images',
     ) {}
 
     /**

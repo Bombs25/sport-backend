@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Complète {@see match_results} jusqu’à au moins {@see self::TARGET_MIN} lignes.
+ * Complète {@see match_results} jusqu’à au moins {@see self::TARGET_MIN} lignes (événements + résultats + évaluations).
  *
  * Cohérence avec {@see MatchResultService} :
  * - {@see match_results.status} = `score_pending_validation` ou `refused` ⇒ {@see match_events.status} = `scheduled`
@@ -22,11 +22,11 @@ use Illuminate\Support\Facades\DB;
  */
 class DemoBulkMatchResultsSeeder extends Seeder
 {
-    private const TARGET_MIN = 500_000;
+    private const TARGET_MIN = 15_000;
 
-    private const TARGET_MIN_COMMENTS = 500_000;
+    private const TARGET_MIN_COMMENTS = 15_000;
 
-    private const TARGET_MIN_RESPONSES = 500_000;
+    private const TARGET_MIN_RESPONSES = 15_000;
 
     /**
      * Nombre de match_events (donc de match_results) insérés par transaction.
@@ -35,7 +35,7 @@ class DemoBulkMatchResultsSeeder extends Seeder
 
     private const EVENT_NOTES = '__bulk_match_results__';
 
-    private const PROGRESS_EVERY = 50_000;
+    private const PROGRESS_EVERY = 5_000;
 
     public function run(): void
     {
@@ -326,7 +326,7 @@ class DemoBulkMatchResultsSeeder extends Seeder
     }
 
     /**
-     * Ajoute au moins 500 000 commentaires + 500 000 réponses.
+     * Ajoute au moins {@see self::TARGET_MIN_COMMENTS} commentaires + {@see self::TARGET_MIN_RESPONSES} réponses.
      *
      * @param  array<int, int>  $userIds
      */

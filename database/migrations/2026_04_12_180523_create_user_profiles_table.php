@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('handle', 32)->unique();
             $table->text('bio')->nullable();
             $table->string('avatar_url', 512)->nullable();
+            $table->string('avatar_blurhash', 255)->nullable();
             $table->boolean('is_private')->default(false);
             $table->geometry('location', subtype: 'point', srid: 4326)->nullable();
             $table->string('city', 120)->nullable()->index();

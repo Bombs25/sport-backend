@@ -7,7 +7,7 @@ use DateInterval;
 use DateTimeInterface;
 
 /**
- * Clés / TTL : progression du lot, résultats blurhash / convert (`finally`).
+ * Clés cache du pipeline d’images (toute {@see ImageProcessingEvent::$uniqueKey}) : progression, blurhash, convert.
  */
 final class ImagePipelineResultCache
 {
@@ -16,18 +16,23 @@ final class ImagePipelineResultCache
         return now()->addHour();
     }
 
-    public static function progressKey(string $uniqueKey, int $userId): string
+    public static function progressKey(string $uniqueKey, int $userId, string $batchId): string
     {
-        return "image-pipeline:progress:{$uniqueKey}:{$userId}";
+        return "image-pipeline:progress:{$uniqueKey}:{$userId}:{$batchId}";
     }
 
-    public static function blurhashKey(string $uniqueKey, int $userId): string
+    public static function blurhashKey(string $uniqueKey, int $userId, string $batchId): string
     {
-        return "image-pipeline:result:blurhash:{$uniqueKey}:{$userId}";
+        return "image-pipeline:result:blurhash:{$uniqueKey}:{$userId}:{$batchId}";
     }
 
-    public static function convertKey(string $uniqueKey, int $userId, ImageVariantLongEdge $variant): string
+    public static function convertKey(string $uniqueKey, int $userId, ImageVariantLongEdge $variant, string $batchId): string
     {
-        return "image-pipeline:result:convert:{$uniqueKey}:{$userId}:{$variant->value}";
+        return "image-pipeline:result:convert:{$uniqueKey}:{$userId}:{$variant->value}:{$batchId}";
+    }
+
+    public static function compressedPathsKey(string $uniqueKey, int $userId, ImageVariantLongEdge $variant, string $batchId): string
+    {
+        return "image-pipeline:compressed:{$uniqueKey}:{$userId}:{$variant->value}:{$batchId}";
     }
 }

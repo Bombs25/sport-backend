@@ -9,6 +9,7 @@ use App\Jobs\CompressImageJob;
 use App\Jobs\ConvertImageJob;
 use App\Jobs\GenerateBlurHashJob;
 use App\Jobs\ImageProcessingQueue;
+use App\Repositories\AddFilesRepository;
 use App\Support\ImagePipelineResultCache;
 use Illuminate\Bus\Batch;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -17,28 +18,34 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ImageProcessingListener
 {
     public function __construct(
         private readonly ImageProcessingInterface $imageProcessing,
+        private readonly AddFilesRepository $addFilesRepository,
     ) {}
 
     /**
-     * Valide les fichiers comme {@see ImageProcessingStoreRequest}, stocke chaque image unique (hash contenu),
-     * puis lance un lot ({@see Bus::batch}) : blur seul, et [compress → convert] en chaîne au sein du même lot.
+     * Pipeline d’upload image côté backend (toute ressource : équipe, endpoint générique {@code /images}, etc.) :
+     * validation comme {@see ImageProcessingStoreRequest}, stockage par hash de contenu sous le disque staging,
+     * puis lot {@see Bus::batch} (blur ; chaîne compress → convert). {@see ImageProcessingEvent::$uniqueKey} est
+     * choisi par l’appelant pour isoler fichiers temporaires et caches.
      */
     public function handle(ImageProcessingEvent $event): void
     {
         $files = ImageProcessingStoreRequest::validatedFileList($event->files);
 
-        /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk();
+        /** @var FilesystemAdapter $disk staging : jamais sous {@code storage/app/public/} */
+        $disk = Storage::disk(ImageProcessingInterface::STAGING_DISK);
         $batchKey = $event->uniqueKey;
+        $variant = $event->variant;
 
         $seenContentHashes = [];
-        $storedPaths = [];
+        /** @var list<array{0: UploadedFile, 1: string, 2: string}> $candidates file, contentHash, filename */
+        $candidates = [];
 
         foreach ($files as $file) {
             if (! $file instanceof UploadedFile || ! $file->isValid()) {
@@ -58,12 +65,39 @@ class ImageProcessingListener
 
             $extension = strtolower((string) ($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin'));
             $filename = "{$contentHash}.{$extension}";
-            $relativePath = "{$batchKey}/{$filename}";
+            $candidates[] = [$file, $contentHash, $filename];
+        }
+
+        if ($candidates === []) {
+            return;
+        }
+
+        $fpHashes = array_column($candidates, 1);
+        sort($fpHashes, SORT_STRING);
+        $fingerprint = hash('sha256', $variant->value."\0".implode("\0", $fpHashes));
+        $dedupKey = "image-processing:dedup:{$batchKey}:{$fingerprint}";
+
+        if (! Cache::add($dedupKey, true, now()->addMinutes(30))) {
+            Log::info('Image processing skipped (duplicate dispatch).', [
+                'batch_key' => $batchKey,
+            ]);
+
+            return;
+        }
+
+        $storedPaths = [];
+        $stagingRoot = "{$batchKey}/".Str::uuid()->toString();
+
+        foreach ($candidates as [$file,, $filename]) {
+            $relativePath = "{$stagingRoot}/{$filename}";
+            $readPath = $file->getRealPath() ?: $file->getPathname();
 
             if (! $disk->exists($relativePath)) {
-                $contents = file_get_contents($path);
+                $contents = file_get_contents($readPath);
                 if ($contents === false) {
-                    continue;
+                    Cache::forget($dedupKey);
+
+                    return;
                 }
                 $disk->put($relativePath, $contents);
             }
@@ -72,14 +106,17 @@ class ImageProcessingListener
         }
 
         if ($storedPaths === []) {
+            Cache::forget($dedupKey);
+
             return;
         }
 
         $user = $event->user;
         $userId = (int) $user->id;
-        $variant = $event->variant;
         $paths = $storedPaths;
         $processing = $this->imageProcessing;
+        $eventType = $event->type;
+        $contextId = $event->contextId;
 
         Bus::batch([
             new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
@@ -94,7 +131,7 @@ class ImageProcessingListener
                 $payload = self::batchProgressPayload($batch);
 
                 Cache::put(
-                    ImagePipelineResultCache::progressKey($batchKey, $userId),
+                    ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id),
                     $payload,
                     now()->addMinutes(30),
                 );
@@ -120,18 +157,15 @@ class ImageProcessingListener
                     'total_jobs' => $batch->totalJobs,
                     'error' => $e->getMessage(),
                 ]);
-            })->finally(function (Batch $batch) use ($batchKey, $userId, $variant) {
-                $defaultDisk = Storage::disk();
-                $suffix = (string) $variant->value;
+            })->finally(function (Batch $batch) use ($batchKey, $userId, $variant, $stagingRoot, $dedupKey, $eventType, $contextId) {
+                Cache::forget($dedupKey);
 
-                if ($defaultDisk->exists($batchKey)) {
-                    $defaultDisk->deleteDirectory($batchKey);
-                }
+                self::removeStagingTree($stagingRoot, $batchKey);
 
-                Cache::forget("image-pipeline:compressed:{$batchKey}:{$userId}:{$suffix}");
+                Cache::forget(ImagePipelineResultCache::compressedPathsKey($batchKey, $userId, $variant, $batch->id));
 
-                $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId);
-                $convertKey = ImagePipelineResultCache::convertKey($batchKey, $userId, $variant);
+                $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId, $batch->id);
+                $convertKey = ImagePipelineResultCache::convertKey($batchKey, $userId, $variant, $batch->id);
 
                 $blurhash = Cache::get($blurKey);
                 $convertJson = Cache::get($convertKey);
@@ -139,21 +173,47 @@ class ImageProcessingListener
                     ? json_decode($convertJson, true)
                     : null;
 
-                Log::info('Image processing batch finished.', [
-                    'batch_id' => $batch->id,
-                    'name' => $batch->name,
-                    'total_jobs' => $batch->totalJobs,
-                    'blurhash' => $blurhash,
-                    'convert_paths' => is_array($convertPaths) ? $convertPaths : $convertJson,
-                ]);
+                $blurhashes = is_string($blurhash) && $blurhash !== ''
+                    ? explode('|', $blurhash)
+                    : [];
 
-                Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId));
+                $convertPathsPayload = is_array($convertPaths)
+                    ? $convertPaths
+                    : (is_string($convertJson) ? $convertJson : null);
+
+                if ($eventType === 'team') {
+                    $this->addFilesRepository->addTeamFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
+                }elseif ($eventType === 'profile') {
+                    $this->addFilesRepository->addProfileFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
+                }
+
+                Log::info('Image processing batch finished.');
+
+                Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id));
                 Cache::forget($blurKey);
                 Cache::forget($convertKey);
             })
             ->name("image-processing:{$batchKey}")
             ->onQueue(ImageProcessingQueue::NAME)
             ->dispatch();
+    }
+
+    private static function removeStagingTree(string $stagingRoot, string $batchKey): void
+    {
+        /** @var FilesystemAdapter $disk */
+        $disk = Storage::disk(ImageProcessingInterface::STAGING_DISK);
+
+        if ($disk->exists($stagingRoot)) {
+            $disk->deleteDirectory($stagingRoot);
+        }
+
+        if (! $disk->exists($batchKey)) {
+            return;
+        }
+
+        if ($disk->directories($batchKey) === [] && $disk->files($batchKey) === []) {
+            $disk->deleteDirectory($batchKey);
+        }
     }
 
     /**
@@ -169,9 +229,8 @@ class ImageProcessingListener
      */
     private static function batchProgressPayload(Batch $batch): array
     {
-        $total = max(1, $batch->totalJobs);
-        $processed = $batch->totalJobs - $batch->pendingJobs;
-        $percent = (int) min(100, max(0, (int) floor((100 * $processed) / $total)));
+        $percent = $batch->progress();
+        $processed = $batch->processedJobs();
 
         $width = 24;
         $filled = (int) round($width * $percent / 100);

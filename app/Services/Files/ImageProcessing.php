@@ -4,6 +4,7 @@ namespace App\Services\Files;
 
 use App\Contracts\Files\ImageProcessingInterface;
 use App\Enums\ImageVariantLongEdge;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Encoders\WebpEncoder;
@@ -15,10 +16,14 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Pipeline type apps sociales :
+ * Traitement d’images uploadées (flux universel backend) :
  * - correction EXIF
- * - une seule sortie par fichier, pilotée par {@see ImageVariantLongEdge} (1080 px flux ou 360 px carré)
- * - WebP ; étape « convert » : fichiers plats sous `public/temps/` (`{uniqueKey}__{stem}.webp`, pas de sous-dossier)
+ * - une sortie par fichier selon {@see ImageVariantLongEdge}
+ * - WebP intermédiaire sur le disque staging ; livrables finaux plats sous {@code public/temps/}
+ *   ({@code {uniqueKey}__{stem}.webp}, où {@code uniqueKey} est le préfixe métier fourni à l’événement)
+ *
+ * Originaux et variantes : disque {@see ImageProcessingInterface::STAGING_DISK} uniquement ;
+ * le disque {@code public} ne reçoit que {@code temps/} pour ce pipeline.
  */
 class ImageProcessing implements ImageProcessingInterface
 {
@@ -39,9 +44,13 @@ class ImageProcessing implements ImageProcessingInterface
     {
         $hashes = [];
 
+        $staging = Storage::disk(ImageProcessingInterface::STAGING_DISK);
+
         foreach ($paths as $path) {
-            $absolute = Storage::disk()->path($path);
+            $absolute = $staging->path($path);
             if (! is_readable($absolute)) {
+                $hashes[] = '';
+
                 continue;
             }
 
@@ -53,9 +62,11 @@ class ImageProcessing implements ImageProcessingInterface
                 $pixels = $this->toRgbGrid($image);
                 if ($pixels !== []) {
                     $hashes[] = Blurhash::encode($pixels, 4, 3);
+                } else {
+                    $hashes[] = '';
                 }
             } catch (Throwable) {
-                continue;
+                $hashes[] = '';
             }
         }
 
@@ -69,20 +80,21 @@ class ImageProcessing implements ImageProcessingInterface
     public function compress(array $paths, ImageVariantLongEdge $variant): array
     {
         $out = [];
+        $staging = Storage::disk(ImageProcessingInterface::STAGING_DISK);
 
         foreach ($paths as $path) {
-            $absolute = Storage::disk()->path($path);
+            $absolute = $staging->path($path);
             if (! is_readable($absolute)) {
                 throw new RuntimeException("Image introuvable pour compression: {$path}");
             }
 
-            $out[] = $this->writeSingleVariant($absolute, $path, $variant);
+            $out[] = $this->writeSingleVariant($staging, $absolute, $path, $variant);
         }
 
         return $out;
     }
 
-    private function writeSingleVariant(string $absolute, string $relativeOriginal, ImageVariantLongEdge $variant): string
+    private function writeSingleVariant(Filesystem $staging, string $absolute, string $relativeOriginal, ImageVariantLongEdge $variant): string
     {
         $stem = pathinfo($relativeOriginal, PATHINFO_FILENAME);
         $px = $variant->value;
@@ -105,22 +117,23 @@ class ImageProcessing implements ImageProcessingInterface
             : "{$batchDir}/variants/{$stem}_{$suffix}.webp";
 
         $encoded = $image->encode(new WebpEncoder(quality: $quality));
-        Storage::disk()->put($relative, $encoded->toString());
+        $staging->put($relative, $encoded->toString());
 
         return $relative;
     }
 
     /**
-     * @param  list<string>  $paths  sortie de {@see compress()} (WebP intermédiaires sur le disque défaut)
+     * @param  list<string>  $paths  sortie de {@see compress()} (WebP intermédiaires sur le disque staging)
      * @return string JSON list<string> chemins relatifs au disque `public` (`temps/{uniqueKey}__{stem}.webp`)
      */
     public function convert(array $paths): string
     {
         $finalPaths = [];
+        $staging = Storage::disk(ImageProcessingInterface::STAGING_DISK);
         $public = Storage::disk('public');
 
         foreach ($paths as $path) {
-            $absolute = Storage::disk()->path($path);
+            $absolute = $staging->path($path);
             if (! is_readable($absolute)) {
                 throw new RuntimeException("Image introuvable pour finalisation WebP: {$path}");
             }

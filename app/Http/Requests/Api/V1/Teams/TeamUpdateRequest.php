@@ -3,8 +3,10 @@
 namespace App\Http\Requests\Api\V1\Teams;
 
 use App\Models\Team;
+use App\Rules\RasterImageFile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 
 class TeamUpdateRequest extends FormRequest
 {
@@ -21,30 +23,29 @@ class TeamUpdateRequest extends FormRequest
     public function rules(): array
     {
         $team = $this->resolveTeam();
-        if ($team === null) {
-            return [
-                'name' => ['sometimes', 'string', 'max:255'],
-                'sport_id' => ['sometimes', 'integer', 'exists:sports,id'],
-                'description' => ['sometimes', 'nullable', 'string', 'max:200'],
-                'hq_city' => ['sometimes', 'nullable', 'string', 'max:120'],
-                'hq_latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
-                'hq_longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-                'cover_image_url' => ['sometimes', 'nullable', 'string', 'max:512'],
-                'logo_url' => ['sometimes', 'nullable', 'string', 'max:512'],
-                'competition_type' => ['sometimes', 'nullable', 'string', Rule::in(['leisure', 'competitive'])],
-                'skill_level' => ['sometimes', 'nullable', 'string', Rule::in(['beginner', 'intermediate', 'expert'])],
-            ];
+
+        $nameRules = ['sometimes', 'string', 'max:255'];
+        if ($team !== null) {
+            $nameRules[] = Rule::unique('teams', 'name')->ignore($team->id);
         }
 
+        $coverRules = $this->hasFile('cover_image_url')
+            ? ['sometimes', File::types(['jpeg', 'jpg', 'png', 'gif', 'webp']), new RasterImageFile]
+            : ['sometimes', 'nullable', 'string', 'max:512'];
+
+        $logoRules = $this->hasFile('logo_url')
+            ? ['sometimes', File::types(['jpeg', 'jpg', 'png', 'gif', 'webp']), new RasterImageFile]
+            : ['sometimes', 'nullable', 'string', 'max:512'];
+
         return [
-            'name' => ['sometimes', 'string', 'max:255', Rule::unique('teams', 'name')->ignore($team->id)],
+            'name' => $nameRules,
             'sport_id' => ['sometimes', 'integer', 'exists:sports,id'],
             'description' => ['sometimes', 'nullable', 'string', 'max:200'],
             'hq_city' => ['sometimes', 'nullable', 'string', 'max:120'],
             'hq_latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'hq_longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-            'cover_image_url' => ['sometimes', 'nullable', 'string', 'max:512'],
-            'logo_url' => ['sometimes', 'nullable', 'string', 'max:512'],
+            'cover_image_url' => $coverRules,
+            'logo_url' => $logoRules,
             'competition_type' => ['sometimes', 'nullable', 'string', Rule::in(['leisure', 'competitive'])],
             'skill_level' => ['sometimes', 'nullable', 'string', Rule::in(['beginner', 'intermediate', 'expert'])],
         ];

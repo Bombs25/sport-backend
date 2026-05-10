@@ -22,6 +22,8 @@ return new class extends Migration
             $table->decimal('hq_longitude', 10, 7)->nullable();
             $table->string('cover_image_url', 512)->nullable();
             $table->string('logo_url', 512)->nullable();
+            $table->string('logo_blurhash', 255)->nullable();
+            $table->string('cover_image_blurhash', 255)->nullable();
             $table->timestamps();
 
             $table->index(['sport_id', 'created_at']);

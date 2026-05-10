@@ -28,7 +28,9 @@ class GenerateBlurHashJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return "{$this->uniqueKey}-{$this->user->id}";
+        $base = "{$this->uniqueKey}-{$this->user->id}";
+
+        return $this->batchId ? "{$base}-{$this->batchId}" : $base;
     }
 
     public function uniqueFor(): int
@@ -63,10 +65,13 @@ class GenerateBlurHashJob implements ShouldBeUnique, ShouldQueue
 
         $blurhash = $this->imageProcessing->generateblurhash($this->paths);
 
-        Cache::put(
-            ImagePipelineResultCache::blurhashKey($this->uniqueKey, (int) $this->user->id),
-            $blurhash,
-            ImagePipelineResultCache::ttl(),
-        );
+        $batchId = (string) ($this->batchId ?? '');
+        if ($batchId !== '') {
+            Cache::put(
+                ImagePipelineResultCache::blurhashKey($this->uniqueKey, (int) $this->user->id, $batchId),
+                $blurhash,
+                ImagePipelineResultCache::ttl(),
+            );
+        }
     }
 }

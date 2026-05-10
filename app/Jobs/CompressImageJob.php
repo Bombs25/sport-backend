@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Contracts\Files\ImageProcessingInterface;
 use App\Enums\ImageVariantLongEdge;
 use App\Models\User;
+use App\Support\ImagePipelineResultCache;
 use DateTimeInterface;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -29,7 +30,9 @@ class CompressImageJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return "{$this->uniqueKey}-{$this->user->id}-{$this->variant->value}";
+        $base = "{$this->uniqueKey}-{$this->user->id}-{$this->variant->value}";
+
+        return $this->batchId ? "{$base}-{$this->batchId}" : $base;
     }
 
     public function uniqueFor(): int
@@ -73,6 +76,11 @@ class CompressImageJob implements ShouldBeUnique, ShouldQueue
 
     private function compressedPathsCacheKey(): string
     {
-        return "image-pipeline:compressed:{$this->uniqueKey}:{$this->user->id}:{$this->variant->value}";
+        return ImagePipelineResultCache::compressedPathsKey(
+            $this->uniqueKey,
+            (int) $this->user->id,
+            $this->variant,
+            (string) ($this->batchId ?? ''),
+        );
     }
 }

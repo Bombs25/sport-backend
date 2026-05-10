@@ -30,7 +30,9 @@ final class ConvertImageJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return "{$this->uniqueKey}-{$this->user->id}-{$this->variant->value}";
+        $base = "{$this->uniqueKey}-{$this->user->id}-{$this->variant->value}";
+
+        return $this->batchId ? "{$base}-{$this->batchId}" : $base;
     }
 
     public function uniqueFor(): int
@@ -70,17 +72,25 @@ final class ConvertImageJob implements ShouldBeUnique, ShouldQueue
 
         $convertJson = $this->imageProcessing->convert($paths);
 
-        Cache::put(
-            ImagePipelineResultCache::convertKey($this->uniqueKey, (int) $this->user->id, $this->variant),
-            $convertJson,
-            ImagePipelineResultCache::ttl(),
-        );
-
         Cache::forget($this->compressedPathsCacheKey());
+
+        $batchId = (string) ($this->batchId ?? '');
+        if ($batchId !== '') {
+            Cache::put(
+                ImagePipelineResultCache::convertKey($this->uniqueKey, (int) $this->user->id, $this->variant, $batchId),
+                $convertJson,
+                ImagePipelineResultCache::ttl(),
+            );
+        }
     }
 
     private function compressedPathsCacheKey(): string
     {
-        return "image-pipeline:compressed:{$this->uniqueKey}:{$this->user->id}:{$this->variant->value}";
+        return ImagePipelineResultCache::compressedPathsKey(
+            $this->uniqueKey,
+            (int) $this->user->id,
+            $this->variant,
+            (string) ($this->batchId ?? ''),
+        );
     }
 }

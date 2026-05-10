@@ -22,4 +22,6 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailFromSignedUrlController::clas
 */
 if (app()->environment('local')) {
     Route::view('/dev/api-test/create-team', 'dev.api-test-create-team');
+    Route::view('/dev/api-test/update-team', 'dev.api-test-update-team');
+    Route::view('/dev/api-test/update-profile', 'dev.api-test-update-profile');
 }

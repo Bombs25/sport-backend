@@ -27,8 +27,8 @@ class TeamStoreRequest extends FormRequest
             'hq_latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'hq_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             // Raster uniquement ; {@see RasterImageFile} vérifie les en-têtes binaires (clients multipart capricieux).
-            'cover_image_url' => ['required', File::types(['jpeg', 'jpg', 'png', 'gif', 'webp'])->max(5120), new RasterImageFile],
-            'logo_url' => ['required', File::types(['jpeg', 'jpg', 'png', 'gif', 'webp'])->max(5120), new RasterImageFile],
+            'cover_image_url' => ['required', File::types(['jpeg', 'jpg', 'png', 'gif', 'webp']), new RasterImageFile],
+            'logo_url' => ['required', File::types(['jpeg', 'jpg', 'png', 'gif', 'webp']), new RasterImageFile],
             'competition_type' => ['nullable', 'string', Rule::in(['leisure', 'competitive'])],
             'skill_level' => ['nullable', 'string', Rule::in(['beginner', 'intermediate', 'expert'])],
         ];
