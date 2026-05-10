@@ -12,6 +12,8 @@ require __DIR__.'/api/v1/auth.php';
 require __DIR__.'/api/v1/register.php';
 // Compte / social : utilisateur courant, profil, follow, profil public (`/api/v1/auth/...`, contrôleurs hors namespace Auth).
 require __DIR__.'/api/v1/account.php';
+// Facturation Stripe (abonnement) sous `/api/v1/auth/billing...`.
+require __DIR__.'/api/v1/billing.php';
 // Équipes : CRUD sous `/api/v1/auth/teams...`.
 require __DIR__.'/api/v1/teams.php';
 require __DIR__.'/api/v1/posts.php';

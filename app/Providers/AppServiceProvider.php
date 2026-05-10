@@ -104,6 +104,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($id.'|'.$request->ip());
         });
 
+        RateLimiter::for('auth-billing-read', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(60)->by($id.'|'.$request->ip());
+        });
+
+        RateLimiter::for('auth-billing-write', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(20)->by($id.'|'.$request->ip());
+        });
+
         RateLimiter::for('auth-team-write', function (Request $request) {
             $id = (string) ($request->user()?->id ?? 'guest');
 
