@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Follow\FollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\FollowDestroyController;
 use App\Http\Controllers\Api\V1\Follow\FollowListController;
 use App\Http\Controllers\Api\V1\Follow\FollowStoreController;
+use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
 use App\Http\Controllers\Api\V1\Profile\UserPublicProfileController;
 use App\Http\Controllers\Api\V1\Users\CurrentUserController;
@@ -20,6 +21,8 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('user', CurrentUserController::class);
     // Met à jour le profil utilisateur (nom, bio, confidentialité, localisation, etc.).
     Route::patch('profile', UpdateProfileController::class);
+    // Notifications en base (10 par page, query `page`).
+    Route::get('notifications', NotificationListController::class)->middleware('throttle:auth-follow-read');
     // S'abonner à un utilisateur (follower → following).
     Route::post('follow', FollowStoreController::class)->middleware('throttle:auth-follow-write');
     // Se désabonner d'un utilisateur.

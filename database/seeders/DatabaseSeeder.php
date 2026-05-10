@@ -11,7 +11,7 @@ use Illuminate\Database\Seeder;
  * Couverture métier : sports, utilisateurs, profils, sports pratiqués, follows, équipes, adhésions, matchs,
  * résultats en masse ({@see DemoBulkMatchResultsSeeder}), évaluations, agrégation stats via {@see StatsFromMatchResultsSeeder}, commentaires, réponses, likes (autres seeders démo), jetons push (fcm_token), jetons Sanctum démo.
  *
- * Non couvert volontairement : `notifications` (morph UUID vs id utilisateur entier), tables framework (`jobs`, `cache`, …).
+ * Notifications base de données démo (≥ 1000 pour feed.demo) : {@see DemoNotificationsSeeder}. Tables framework (`jobs`, `cache`, …) hors scope.
  *
  * Comptes démo (mot de passe habituel de la factory : « password ») :
  * - {@see DemoMatchCalendarSeeder} : calendar.demo@osport.local — token `demo-calendar-seed`
@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             DemoMatchSocialInteractionsSeeder::class,
             DemoBulkMatchResultsSeeder::class,
             StatsFromMatchResultsSeeder::class,
+            DemoNotificationsSeeder::class,
         ]);
 
         if ($this->command !== null) {
