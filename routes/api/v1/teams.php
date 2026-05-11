@@ -27,6 +27,9 @@ use Illuminate\Support\Facades\Route;
 | Ce qu’il fait : CRUD + liste des équipes sous `/api/v1/auth/teams...` (Bearer Sanctum).
 |
 | Pourquoi : domaine **Teams** (`App\Http\Controllers\Api\V1\Teams`) ; fichier chargé depuis `routes/api.php`.
+|
+| Abonnement : le middleware `ensure.subscribed` (Cashier, type `billing.subscription_type`) protège la création
+| d’équipe, les demandes d’intégration, les demandes / décisions de match et la saisie des résultats / litiges.
 */
 
 Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
@@ -35,7 +38,7 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // Liste « Mes équipes » : blocs créées / rejointes + effectifs (Bearer).
     Route::get('teams', TeamListController::class)->middleware('throttle:auth-team-read');
     // Crée une équipe ; le créateur devient captain actif dans team_members.
-    Route::post('teams', TeamStoreController::class)->middleware('throttle:auth-team-write');
+    Route::post('teams', TeamStoreController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
     // Met à jour une équipe (créateur ou captain actif).
     Route::patch('teams/{team_id}', TeamUpdateController::class)->middleware('throttle:auth-team-write');
     // Supprime définitivement une équipe (créateur uniquement).
@@ -57,11 +60,11 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // Dernier match à score validé (noms, logos, scores, issue pour l'équipe consultée).
     Route::get('teams/{team_id}/latest-match', TeamLatestMatchShowController::class)->middleware('throttle:auth-team-read');
     // Demande d'intégration à une équipe (utilisateur connecté).
-    Route::post('teams/{team_id}/integrations', TeamIntegrationStoreController::class)->middleware('throttle:auth-team-write');
+    Route::post('teams/{team_id}/integrations', TeamIntegrationStoreController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
     // Sortie d'équipe (self) ou suppression d'un membre (créateur/captain actif).
     Route::delete('teams/{team_id}/members/{member_user_id}', TeamMemberDestroyController::class)->middleware('throttle:auth-team-write');
     // Demande de match entre deux équipes du même sport.
-    Route::post('teams/{team_id}/match-requests', TeamMatchRequestStoreController::class)->middleware('throttle:auth-team-write');
+    Route::post('teams/{team_id}/match-requests', TeamMatchRequestStoreController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
 
     // ////////// page classement equipes ////////////
     // Classement des equipes pour un sport et une annee (saison resolue par SeasonStrategy bindee).
@@ -73,14 +76,14 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // Liste des demandes de match (reçu/envoyé), paginée.
     Route::get('teams/match-requests', TeamMatchRequestListController::class)->middleware('throttle:auth-team-read');
     // Décision sur une demande reçue: accept/refuse.
-    Route::patch('teams/match-requests/{match_event_id}', TeamMatchRequestDecisionController::class)->middleware('throttle:auth-team-write');
+    Route::patch('teams/match-requests/{match_event_id}', TeamMatchRequestDecisionController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
 
     // Premier envoi : score + 1re évaluation — uniquement **home_team_id** (demandeur du match, même sens que POST match-requests).
-    Route::post('teams/{team_id}/match-events/{match_event_id}/result', TeamMatchResultStoreController::class)->middleware('throttle:auth-team-write');
+    Route::post('teams/{team_id}/match-events/{match_event_id}/result', TeamMatchResultStoreController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
     // 2e envoi : validation ou refus (+ 2e évaluation si validation) — uniquement capitaine / créateur **away_team_id**.
-    Route::patch('teams/match-events/{match_event_id}/result', TeamMatchResultRespondController::class)->middleware('throttle:auth-team-write');
+    Route::patch('teams/match-events/{match_event_id}/result', TeamMatchResultRespondController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
     // Litige après refus : même acteur que la réponse adverse (away).
-    Route::post('teams/match-events/{match_event_id}/result/dispute', TeamMatchDisputeStoreController::class)->middleware('throttle:auth-team-write');
+    Route::post('teams/match-events/{match_event_id}/result/dispute', TeamMatchDisputeStoreController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
 
     // Détail d'une équipe (membre actif uniquement). +++++++
     // Route::get('teams/{team_id}', TeamShowController::class)->middleware('throttle:auth-team-read');
