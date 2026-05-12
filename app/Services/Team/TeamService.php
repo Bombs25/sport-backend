@@ -3,14 +3,21 @@
 namespace App\Services\Team;
 
 use App\Models\Team;
+use App\Services\Search\TypesenseTeamService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Typesense\Exceptions\TypesenseClientError;
 
 class TeamService
 {
+    public function __construct(
+        private readonly TypesenseTeamService $typesenseTeams,
+    ) {}
+
     /**
      * Construit la réponse "Mes équipes" en séparant les équipes créées et rejointes,
      * avec un compteur de membres actifs par équipe.
@@ -105,6 +112,7 @@ class TeamService
         });
 
         $this->cacheUserSportId($creatorId, (int) $data['sport_id']);
+        $this->syncTeamToTypesense((int) $team->id);
 
         return $team;
     }
@@ -152,6 +160,7 @@ class TeamService
 
         DB::table('teams')->where('id', $team->id)->update($updates);
         $team->refresh();
+        $this->syncTeamToTypesense((int) $team->id);
     }
 
     /**
@@ -160,6 +169,18 @@ class TeamService
     public function deleteTeam(Team $team): void
     {
         DB::table('teams')->where('id', $team->id)->delete();
+    }
+
+    private function syncTeamToTypesense(int $teamId): void
+    {
+        try {
+            $this->typesenseTeams->syncTeamFromDatabase($teamId);
+        } catch (TypesenseClientError $e) {
+            Log::warning('Typesense team sync failed.', [
+                'team_id' => $teamId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

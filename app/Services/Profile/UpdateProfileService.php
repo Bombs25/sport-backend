@@ -2,9 +2,12 @@
 
 namespace App\Services\Profile;
 
+use App\Services\Search\TypesenseTeamService;
 use App\Support\UserProfileLocation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Typesense\Exceptions\TypesenseClientError;
 
 /**
  * Ce qu'il fait : applique une mise à jour partielle du profil (`users` + `user_profiles`) pour l'utilisateur authentifié.
@@ -13,12 +16,17 @@ use Illuminate\Support\Str;
  */
 class UpdateProfileService
 {
+    public function __construct(
+        private readonly TypesenseTeamService $typesenseTeams,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $validated
      */
     public function update(int $userId, array $validated): void
     {
         $profileUpdates = [];
+        $locationChanged = array_key_exists('latitude', $validated) || array_key_exists('longitude', $validated);
 
         if (array_key_exists('given_name', $validated) || array_key_exists('family_name', $validated)) {
             $currentUser = DB::table('users')->select(['name'])->where('id', $userId)->first();
@@ -85,6 +93,22 @@ class UpdateProfileService
         $profileUpdates['updated_at'] = now();
 
         DB::table('user_profiles')->where('user_id', $userId)->update($profileUpdates);
+
+        if ($locationChanged) {
+            $this->syncCreatorTeamsToTypesense($userId);
+        }
+    }
+
+    private function syncCreatorTeamsToTypesense(int $userId): void
+    {
+        try {
+            $this->typesenseTeams->syncTeamsForCreatorFromDatabase($userId);
+        } catch (TypesenseClientError $e) {
+            Log::warning('Typesense creator teams location sync failed.', [
+                'user_id' => $userId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -130,8 +130,10 @@ class DemoBulkMatchResultsSeeder extends Seeder
             $homeCap = $captainByTeam[$homeTeamId];
             $awayCap = $captainByTeam[$awayTeamId];
 
-            // UTC : évite les heures « inexistantes » (passage heure d’été) si APP_TIMEZONE est DST.
-            $scheduledAt = $now->copy()->utc()->subDays(($i % 400) + 1)->subHours($i % 24);
+            // Heures de journée uniquement : évite les heures inexistantes pendant les changements DST.
+            $scheduledAt = $now->copy()
+                ->setTime(12 + ($i % 6), $i % 60, $i % 60)
+                ->subDays(($i % 400) + 1);
             $bucket = $i % 10;
 
             if ($bucket < 7) {

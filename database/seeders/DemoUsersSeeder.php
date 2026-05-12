@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Services\Search\TypesenseUserService;
 use App\Support\UserProfileLocation;
 use Carbon\CarbonInterface;
+use Faker\Factory as FakerFactory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Typesense\Exceptions\TypesenseClientError;
 
 class DemoUsersSeeder extends Seeder
 {
@@ -17,6 +20,8 @@ class DemoUsersSeeder extends Seeder
 
     /** @var list<string> */
     private const SKILL_LEVELS = ['beginner', 'intermediate', 'expert'];
+
+    private const NAME_POOL_SIZE = 2000;
 
     /**
      * Centres-ville approximatifs (WGS-84), France métropolitaine.
@@ -51,10 +56,10 @@ class DemoUsersSeeder extends Seeder
 
     public function run(): void
     {
-        // $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 1_000_000)));
         $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 15_000)));
         $now = now();
         $passwordHash = Hash::make('password');
+        $namePool = $this->buildNamePool();
 
         $sportIds = DB::table('sports')->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $shouldSeedFollows = filter_var(
@@ -62,14 +67,25 @@ class DemoUsersSeeder extends Seeder
             FILTER_VALIDATE_BOOL
         );
 
+        $typesense = app(TypesenseUserService::class);
+
+        try {
+            $typesense->ensureCollection();
+        } catch (TypesenseClientError $e) {
+            $this->command?->warn('Typesense indisponible, import ignoré : '.$e->getMessage());
+            $typesense = null;
+        }
+
         for ($base = 0; $base < $totalUsers; $base += self::INSERT_CHUNK) {
             $chunkSize = min(self::INSERT_CHUNK, $totalUsers - $base);
 
             $userRows = [];
             for ($i = 0; $i < $chunkSize; $i++) {
                 $n = $base + $i + 1;
+                $fullName = $this->demoFullName($n, $namePool);
+
                 $userRows[] = [
-                    'name' => "Demo User {$n}",
+                    'name' => $fullName,
                     'email' => "demo.user.{$n}@seed.osport.test",
                     'email_verified_at' => $now,
                     'password' => $passwordHash,
@@ -93,15 +109,20 @@ class DemoUsersSeeder extends Seeder
             }
 
             $profileRows = [];
+            $typesenseDocs = [];
             foreach ($userIds as $offset => $userId) {
                 $n = $base + $offset + 1;
                 $place = $this->frenchPlaceForDemoUser($userId);
+                $fullName = $this->demoFullName($n, $namePool);
+                $displayName = Str::limit($fullName, 64, '');
+                $handle = $this->deterministicHandle($n);
+                $bio = 'Profil démo n°'.$n.'.';
+
                 $profileRows[] = array_merge([
                     'user_id' => $userId,
-                    'display_name' => Str::limit("Demo User {$n}", 64, ''),
-                    'handle' => $this->deterministicHandle($n),
-                    'bio' => 'Profil démo n°'.$n.'.',
-                    'avatar_url' => null,
+                    'display_name' => $displayName,
+                    'handle' => $handle,
+                    'bio' => $bio,
                     'is_private' => false,
                     'city' => $place['name'],
                     'address_line' => null,
@@ -112,9 +133,30 @@ class DemoUsersSeeder extends Seeder
                     $place['latitude'],
                     $place['longitude'],
                 ));
+
+                $typesenseDocs[] = [
+                    'id' => (string) $userId,
+                    'name' => $fullName,
+                    'email' => "demo.user.{$n}@seed.osport.test",
+                    'display_name' => $displayName,
+                    'handle' => $handle,
+                    'bio' => $bio,
+                    'is_private' => false,
+                    'city' => $place['name'],
+                    'location' => [$place['latitude'], $place['longitude']],
+                    'created_at' => $now->timestamp,
+                ];
             }
 
             DB::table('user_profiles')->insert($profileRows);
+
+            if ($typesense !== null) {
+                try {
+                    $typesense->importDocuments($typesenseDocs);
+                } catch (TypesenseClientError $e) {
+                    $this->command?->warn('Typesense import échoué (chunk '.($base + 1).') : '.$e->getMessage());
+                }
+            }
 
             if ($sportIds !== []) {
                 $sportRows = $this->buildUserSportsRows($userIds, $sportIds, $base, $now);
@@ -152,6 +194,31 @@ class DemoUsersSeeder extends Seeder
         $suffix = substr(md5((string) $n), 0, 6);
 
         return Str::limit('u_'.$n.'_'.$suffix, 32, '');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function buildNamePool(): array
+    {
+        $faker = FakerFactory::create('fr_FR');
+        $faker->seed(42);
+
+        $names = [];
+        while (count($names) < self::NAME_POOL_SIZE) {
+            $fullName = $faker->firstName().' '.$faker->lastName();
+            $names[$fullName] = $fullName;
+        }
+
+        return array_values($names);
+    }
+
+    /**
+     * @param  list<string>  $namePool
+     */
+    private function demoFullName(int $n, array $namePool): string
+    {
+        return $namePool[($n - 1) % count($namePool)];
     }
 
     private function deterministicBirthDate(int $n): string

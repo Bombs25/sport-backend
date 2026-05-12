@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Typesense\Client;
 
 /**
  * Ce qu’il fait : enregistre les **rate limiters nommés** référencés par les routes API (ex. `throttle:auth-login`).
@@ -38,6 +39,22 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(StatsRepository::class, QueryBuilderStatsRepository::class);
         $this->app->scoped(TeamMatchReadRepository::class, QueryBuilderTeamMatchReadRepository::class);
         $this->app->scoped(ImageProcessingInterface::class, ImageProcessing::class);
+        $this->app->scoped(Client::class, function () {
+            $t = config('services.typesense');
+            $client = new Client([
+                'api_key' => $t['api_key'],
+                'nodes' => [
+                    [
+                        'host' => $t['host'],
+                        'port' => $t['port'],
+                        'protocol' => $t['protocol'],
+                    ],
+                ],
+                'connection_timeout_seconds' => 10,
+            ]);
+
+            return $client;
+        });
     }
 
     public function boot(): void

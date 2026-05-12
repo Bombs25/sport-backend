@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Search\TeamNearbySearchController;
 use App\Http\Controllers\Api\V1\Teams\TeamDestroyController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationDecisionController;
 use App\Http\Controllers\Api\V1\Teams\TeamIntegrationPendingListController;
@@ -37,6 +38,8 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // ////////// page equipe ////////////
     // Liste « Mes équipes » : blocs créées / rejointes + effectifs (Bearer).
     Route::get('teams', TeamListController::class)->middleware('throttle:auth-team-read');
+    // Recherche d'équipes autour de la localisation du profil connecté.
+    Route::get('teams/search', TeamNearbySearchController::class)->middleware('throttle:auth-team-read');
     // Crée une équipe ; le créateur devient captain actif dans team_members.
     Route::post('teams', TeamStoreController::class)->middleware(['throttle:auth-team-write', 'ensure.subscribed']);
     // Met à jour une équipe (créateur ou captain actif).

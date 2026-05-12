@@ -1,8 +1,11 @@
 <?php
 
+use App\Services\Search\TypesenseTeamService;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Typesense\Client;
+use Typesense\Exceptions\ObjectNotFound;
 
 return new class extends Migration
 {
@@ -43,6 +46,16 @@ return new class extends Migration
             $table->unique(['team_id', 'user_id']);
             $table->index(['user_id', 'status']);
         });
+
+        $client = app(Client::class);
+
+        try {
+            $client->collections['teams']->delete();
+        } catch (ObjectNotFound) {
+            //
+        }
+
+        $client->collections->create(TypesenseTeamService::schema());
     }
 
     public function down(): void

@@ -2,8 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Services\Search\TypesenseTeamService;
+use App\Services\Search\TypesenseUserService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Typesense\Exceptions\TypesenseClientError;
 
 /**
  * Jeu de données cohérent pour toute l’app **telle que migrée** (pas de tables `posts`, `subscriptions`, etc. tant qu’elles n’existent pas).
@@ -37,9 +40,42 @@ class DatabaseSeeder extends Seeder
             DemoNotificationsSeeder::class,
         ]);
 
+        $this->syncTypesenseUsers();
+        $this->syncTypesenseTeams();
+
         if ($this->command !== null) {
             $this->command->newLine();
             $this->command->info('Résumé démo : calendar.demo@osport.local et feed.demo@osport.local (password = password).');
         }
+    }
+
+    private function syncTypesenseUsers(): void
+    {
+        try {
+            $service = app(TypesenseUserService::class);
+            $service->recreateCollection();
+            $synced = $service->syncAllUsersFromDatabase();
+        } catch (TypesenseClientError $e) {
+            $this->command?->warn('Typesense indisponible, synchronisation finale ignorée : '.$e->getMessage());
+
+            return;
+        }
+
+        $this->command?->info('Typesense users synchronisé depuis MySQL : '.$synced.' document(s).');
+    }
+
+    private function syncTypesenseTeams(): void
+    {
+        try {
+            $service = app(TypesenseTeamService::class);
+            $service->recreateCollection();
+            $synced = $service->syncAllTeamsFromDatabase();
+        } catch (TypesenseClientError $e) {
+            $this->command?->warn('Typesense indisponible, synchronisation finale teams ignorée : '.$e->getMessage());
+
+            return;
+        }
+
+        $this->command?->info('Typesense teams synchronisé depuis MySQL : '.$synced.' document(s).');
     }
 }

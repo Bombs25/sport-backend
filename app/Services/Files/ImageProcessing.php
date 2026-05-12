@@ -7,6 +7,7 @@ use App\Enums\ImageVariantLongEdge;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Encoders\WebpEncoder;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\ImageInterface;
@@ -34,7 +35,7 @@ class ImageProcessing implements ImageProcessingInterface
 
     public function __construct()
     {
-        $this->images = ImageManager::gd();
+        $this->images = new ImageManager(new Driver);
     }
 
     /**
@@ -55,7 +56,7 @@ class ImageProcessing implements ImageProcessingInterface
             }
 
             try {
-                $image = $this->images->read($absolute);
+                $image = $this->images->decodePath($absolute);
                 $image->orient();
                 $image->scaleDown(width: self::BLURHASH_SAMPLE_EDGE, height: self::BLURHASH_SAMPLE_EDGE);
 
@@ -100,7 +101,7 @@ class ImageProcessing implements ImageProcessingInterface
         $px = $variant->value;
         $suffix = (string) $px;
 
-        $image = $this->images->read($absolute);
+        $image = $this->images->decodePath($absolute);
         $image->orient();
 
         if ($variant === ImageVariantLongEdge::Feed) {
@@ -138,8 +139,8 @@ class ImageProcessing implements ImageProcessingInterface
                 throw new RuntimeException("Image introuvable pour finalisation WebP: {$path}");
             }
 
-            $image = $this->images->read($absolute);
-            $image->blendTransparency('#ffffff');
+            $image = $this->images->decodePath($absolute);
+            $image->fillTransparentAreas('#ffffff');
 
             $stem = pathinfo($path, PATHINFO_FILENAME);
             $isGrid = str_ends_with($stem, '_'.ImageVariantLongEdge::GridThumb->value);
@@ -179,11 +180,11 @@ class ImageProcessing implements ImageProcessingInterface
         for ($y = 0; $y < $image->height(); $y++) {
             $row = [];
             for ($x = 0; $x < $image->width(); $x++) {
-                $channels = $image->pickColor($x, $y)->toArray();
+                $channels = $image->colorAt($x, $y)->channels();
                 $row[] = [
-                    (int) ($channels[0] ?? 0),
-                    (int) ($channels[1] ?? 0),
-                    (int) ($channels[2] ?? 0),
+                    (int) ($channels[0]?->value() ?? 0),
+                    (int) ($channels[1]?->value() ?? 0),
+                    (int) ($channels[2]?->value() ?? 0),
                 ];
             }
             $pixels[] = $row;

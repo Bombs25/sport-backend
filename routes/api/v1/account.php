@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Follow\FollowStoreController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
 use App\Http\Controllers\Api\V1\Profile\UserPublicProfileController;
+use App\Http\Controllers\Api\V1\Search\UserNearbySearchController;
 use App\Http\Controllers\Api\V1\Users\CurrentUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,8 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('follows/counts', FollowCountsController::class)->middleware('throttle:auth-follow-read');
     // Liste followers ou following du compte connecté (query : type, limit, cursor ; FlatList).
     Route::get('follows', FollowListController::class)->middleware('throttle:auth-follow-read');
+    // Recherche de profils publics autour de la localisation du profil connecté.
+    Route::get('users/search', UserNearbySearchController::class)->middleware('throttle:auth-follow-read');
     // Profil public d'un utilisateur (id) : e-mail masqué sauf soi-même ; comptes privés si non autorisé.
     Route::get('users/{user}/profile', UserPublicProfileController::class)->middleware('throttle:auth-follow-read');
 });

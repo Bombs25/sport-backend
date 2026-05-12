@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace App\Repositories;
 
+use App\Events\ImageProcessingEvent;
+use App\Http\Controllers\Api\V1\Teams\TeamStoreController;
+use App\Services\Search\TypesenseTeamService;
+use App\Services\Search\TypesenseUserService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Typesense\Exceptions\TypesenseClientError;
 
 class AddFilesRepository
 {
+    public function __construct(
+        private readonly TypesenseTeamService $typesenseTeams,
+        private readonly TypesenseUserService $typesenseUsers,
+    ) {}
+
     /**
      * Écrit les médias équipe sur {@see teams} : ordre = cover puis logo
-     * (voir {@see \App\Http\Controllers\Api\V1\Teams\TeamStoreController}).
+     * (voir {@see TeamStoreController}).
      *
      * @param  list<string>  $blurhashes
      * @param  array<string, mixed>|list<mixed>|string|null  $convertPaths  JSON ou liste de chemins disque {@code public}
@@ -36,12 +47,21 @@ class AddFilesRepository
             'logo_blurhash' => $blurhashes[1] ?? null,
             'updated_at' => now(),
         ]);
+
+        try {
+            $this->typesenseTeams->syncTeamFromDatabase((int) $teamId);
+        } catch (TypesenseClientError $e) {
+            Log::warning('Typesense team media sync failed.', [
+                'team_id' => $teamId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
      * @param  list<string>  $blurhashes
      * @param  array<string, mixed>|list<mixed>|string|null  $convertPaths
-     * @param  int|null  $userId  même valeur que {@see \App\Events\ImageProcessingEvent::$contextId} pour {@code type=profile}
+     * @param  int|null  $userId  même valeur que {@see ImageProcessingEvent::$contextId} pour {@code type=profile}
      */
     public function addProfileFilesUrlToDb(array $blurhashes, array|string|null $convertPaths, ?int $userId): void
     {
@@ -61,5 +81,14 @@ class AddFilesRepository
             'avatar_blurhash' => $blurhashes[0] ?? null,
             'updated_at' => now(),
         ]);
+
+        try {
+            $this->typesenseUsers->syncUserFromDatabase((int) $userId);
+        } catch (TypesenseClientError $e) {
+            Log::warning('Typesense profile avatar sync failed.', [
+                'user_id' => $userId,
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 }
