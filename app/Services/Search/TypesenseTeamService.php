@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Support\PublicImageUrl;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -374,8 +375,8 @@ class TypesenseTeamService
                 'hq_longitude' => isset($document['hq_longitude']) ? (float) $document['hq_longitude'] : null,
                 'latitude' => $location !== null && array_key_exists(0, $location) ? (float) $location[0] : null,
                 'longitude' => $location !== null && array_key_exists(1, $location) ? (float) $location[1] : null,
-                'cover_image_url' => $document['cover_image_url'] ?? null,
-                'logo_url' => $document['logo_url'] ?? null,
+                'cover_image_url' => PublicImageUrl::from($document['cover_image_url'] ?? null),
+                'logo_url' => PublicImageUrl::from($document['logo_url'] ?? null),
                 'cover_image_blurhash' => $document['cover_image_blurhash'] ?? null,
                 'logo_blurhash' => $document['logo_blurhash'] ?? null,
                 'members_count' => (int) ($document['members_count'] ?? 0),

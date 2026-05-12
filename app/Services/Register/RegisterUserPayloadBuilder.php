@@ -4,6 +4,7 @@ namespace App\Services\Register;
 
 use App\Models\User;
 use App\Repositories\RegisterUserReader;
+use App\Support\PublicImageUrl;
 
 /**
  * Ce qu’il fait : assemble le **JSON « user »** renvoyé au client après chaque étape d’inscription,
@@ -57,7 +58,7 @@ class RegisterUserPayloadBuilder
                 'display_name' => $row->display_name,
                 'handle' => $row->handle,
                 'bio' => $row->bio,
-                'avatar_url' => $row->avatar_url,
+                'avatar_url' => PublicImageUrl::from($row->avatar_url),
                 'is_private' => (bool) $row->is_private,
                 'latitude' => $row->latitude !== null ? (float) $row->latitude : null,
                 'longitude' => $row->longitude !== null ? (float) $row->longitude : null,
@@ -70,7 +71,7 @@ class RegisterUserPayloadBuilder
                 'name' => $s->name,
                 'slug' => $s->slug,
                 'practice_type' => $s->practice_type,
-                'avatar' => $s->avatar,
+                'avatar' => PublicImageUrl::from($s->avatar),
                 'is_favorite' => (bool) $s->is_favorite,
             ])->values()->all(),
         ];
@@ -105,7 +106,7 @@ class RegisterUserPayloadBuilder
                 'display_name' => $row->display_name,
                 'handle' => $row->handle,
                 'bio' => $row->bio,
-                'avatar_url' => $row->avatar_url,
+                'avatar_url' => PublicImageUrl::from($row->avatar_url),
                 'is_private' => (bool) $row->is_private,
                 'latitude' => $row->latitude !== null ? (float) $row->latitude : null,
                 'longitude' => $row->longitude !== null ? (float) $row->longitude : null,
@@ -118,7 +119,7 @@ class RegisterUserPayloadBuilder
                 'name' => $s->name,
                 'slug' => $s->slug,
                 'practice_type' => $s->practice_type,
-                'avatar' => $s->avatar,
+                'avatar' => PublicImageUrl::from($s->avatar),
                 'is_favorite' => (bool) $s->is_favorite,
             ])->values()->all(),
         ];

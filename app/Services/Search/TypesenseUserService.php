@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Support\PublicImageUrl;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -298,7 +299,7 @@ class TypesenseUserService
                 'display_name' => (string) ($document['display_name'] ?? ''),
                 'handle' => (string) ($document['handle'] ?? ''),
                 'bio' => $document['bio'] ?? null,
-                'avatar_url' => $document['avatar_url'] ?? null,
+                'avatar_url' => PublicImageUrl::from($document['avatar_url'] ?? null),
                 'avatar_blurhash' => $document['avatar_blurhash'] ?? null,
                 'is_private' => (bool) ($document['is_private'] ?? false),
                 'city' => $document['city'] ?? null,

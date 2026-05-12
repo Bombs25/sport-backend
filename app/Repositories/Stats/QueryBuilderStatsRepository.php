@@ -4,6 +4,7 @@ namespace App\Repositories\Stats;
 
 use App\Contracts\Stats\StatsRepository;
 use App\Services\Stats\SeasonWindow;
+use App\Support\PublicImageUrl;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -152,7 +153,7 @@ class QueryBuilderStatsRepository implements StatsRepository
                 'rank' => (int) $row->rank_position,
                 'team_id' => (int) $row->team_id,
                 'team_name' => (string) $row->team_name,
-                'logo_url' => $row->team_logo_url !== null ? (string) $row->team_logo_url : null,
+                'logo_url' => PublicImageUrl::from($row->team_logo_url),
                 'victory_count' => (int) $row->victory_count,
                 'draw_count' => (int) $row->draw_count,
                 'defeat_count' => (int) $row->defeat_count,

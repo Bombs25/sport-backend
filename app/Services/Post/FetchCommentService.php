@@ -2,6 +2,7 @@
 
 namespace App\Services\Post;
 
+use App\Support\PublicImageUrl;
 use Illuminate\Support\Facades\DB;
 
 class FetchCommentService
@@ -90,7 +91,7 @@ class FetchCommentService
                     'user_name' => (string) $row->user_name,
                     'user_display_name' => $row->user_display_name !== null ? (string) $row->user_display_name : null,
                     'user_handle' => $row->user_handle !== null ? (string) $row->user_handle : null,
-                    'user_avatar_url' => $row->user_avatar_url !== null ? (string) $row->user_avatar_url : null,
+                    'user_avatar_url' => PublicImageUrl::from($row->user_avatar_url),
                     'likes_count' => (int) $row->likes_count,
                     'responses_count' => (int) $row->responses_count,
                     'created_at' => $row->created_at,
@@ -187,7 +188,7 @@ class FetchCommentService
                     'user_name' => (string) $row->user_name,
                     'user_display_name' => $row->user_display_name !== null ? (string) $row->user_display_name : null,
                     'user_handle' => $row->user_handle !== null ? (string) $row->user_handle : null,
-                    'user_avatar_url' => $row->user_avatar_url !== null ? (string) $row->user_avatar_url : null,
+                    'user_avatar_url' => PublicImageUrl::from($row->user_avatar_url),
                     'likes_count' => (int) $row->likes_count,
                     'created_at' => $row->created_at,
                     'viewer_has_liked' => (bool) ($row->viewer_has_liked ?? false),

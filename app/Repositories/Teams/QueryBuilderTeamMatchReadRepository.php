@@ -3,6 +3,7 @@
 namespace App\Repositories\Teams;
 
 use App\Contracts\Teams\TeamMatchReadRepository;
+use App\Support\PublicImageUrl;
 use Illuminate\Support\Facades\DB;
 
 class QueryBuilderTeamMatchReadRepository implements TeamMatchReadRepository
@@ -48,8 +49,8 @@ class QueryBuilderTeamMatchReadRepository implements TeamMatchReadRepository
             'away_team_id' => (int) $row->away_team_id,
             'home_team_name' => (string) $row->home_team_name,
             'away_team_name' => (string) $row->away_team_name,
-            'home_team_logo_url' => $row->home_team_logo_url !== null ? (string) $row->home_team_logo_url : null,
-            'away_team_logo_url' => $row->away_team_logo_url !== null ? (string) $row->away_team_logo_url : null,
+            'home_team_logo_url' => PublicImageUrl::from($row->home_team_logo_url),
+            'away_team_logo_url' => PublicImageUrl::from($row->away_team_logo_url),
             'home_score' => (int) $row->home_score,
             'away_score' => (int) $row->away_score,
             'validated_at' => $row->validated_at !== null ? (string) $row->validated_at : null,

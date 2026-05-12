@@ -4,6 +4,7 @@ namespace App\Services\Team;
 
 use App\Models\Team;
 use App\Services\Search\TypesenseTeamService;
+use App\Support\PublicImageUrl;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -380,7 +381,7 @@ class TeamService
                     'user_id' => (int) $row->user_id,
                     'name' => $row->name,
                     'email' => $row->email,
-                    'avatar_url' => $row->avatar_url,
+                    'avatar_url' => PublicImageUrl::from($row->avatar_url),
                     'requested_at' => $row->requested_at,
                 ])
                 ->values()
@@ -497,7 +498,7 @@ class TeamService
                     ->map(static fn (object $row): array => [
                         'user_id' => (int) $row->user_id,
                         'name' => $row->name,
-                        'avatar_url' => $row->avatar_url,
+                        'avatar_url' => PublicImageUrl::from($row->avatar_url),
                         'role' => $row->role,
                     ])
                     ->values()
@@ -803,7 +804,7 @@ class TeamService
             $membersByTeam[$teamId][] = [
                 'user_id' => (int) $row->user_id,
                 'name' => $row->name,
-                'avatar_url' => $row->avatar_url,
+                'avatar_url' => PublicImageUrl::from($row->avatar_url),
                 'role' => $row->role,
             ];
         }
@@ -937,8 +938,8 @@ class TeamService
             'hq_city' => $row->hq_city,
             'hq_latitude' => $row->hq_latitude !== null ? (float) $row->hq_latitude : null,
             'hq_longitude' => $row->hq_longitude !== null ? (float) $row->hq_longitude : null,
-            'cover_image_url' => $row->cover_image_url,
-            'logo_url' => $row->logo_url,
+            'cover_image_url' => PublicImageUrl::from($row->cover_image_url),
+            'logo_url' => PublicImageUrl::from($row->logo_url),
             'competition_type' => $row->competition_type,
             'skill_level' => $row->skill_level,
             'members_count' => (int) ($countsMap[$id] ?? 0),
@@ -968,8 +969,8 @@ class TeamService
             'hq_city' => $row->hq_city,
             'hq_latitude' => $row->hq_latitude !== null ? (float) $row->hq_latitude : null,
             'hq_longitude' => $row->hq_longitude !== null ? (float) $row->hq_longitude : null,
-            'cover_image_url' => $row->cover_image_url,
-            'logo_url' => $row->logo_url,
+            'cover_image_url' => PublicImageUrl::from($row->cover_image_url),
+            'logo_url' => PublicImageUrl::from($row->logo_url),
             'competition_type' => $row->competition_type,
             'skill_level' => $row->skill_level,
             'members_count' => $membersCount,

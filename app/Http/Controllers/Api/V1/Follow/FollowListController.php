@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Follow;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Follow\FollowListRequest;
 use App\Services\Follow\FollowService;
+use App\Support\PublicImageUrl;
 use Illuminate\Http\JsonResponse;
 
 class FollowListController extends Controller
@@ -44,7 +45,7 @@ class FollowListController extends Controller
                     'email' => $item->email,
                     'handle' => $item->handle,
                     'display_name' => $item->display_name,
-                    'avatar_url' => $item->avatar_url,
+                    'avatar_url' => PublicImageUrl::from($item->avatar_url),
                     'followed_at' => $item->followed_at,
                     'am_i_following' => $amIFollowing,
                 ];

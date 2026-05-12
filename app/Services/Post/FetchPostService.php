@@ -2,14 +2,17 @@
 
 namespace App\Services\Post;
 
+use App\Support\PublicImageUrl;
 use App\Support\UserProfileLocation;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class FetchPostService
 {
+    public const PUBLICATION_TYPE_REGULAR = 'regular';
+
     public const PUBLICATION_TYPE_MATCH_RESULT = 'match_result';
 
     /**
@@ -27,6 +30,10 @@ class FetchPostService
     public const CENTRE_INTERET_RADIUS_METERS = 20_000;
 
     public const MATCH_RESULTS_LIMIT = 100;
+
+    public const REGULAR_POST_FEED_STATUS = 'published';
+
+    public const REGULAR_POST_TARGET = 10;
 
     /**
      * @param  array<int, int>  $clientViewedMatchResultIds  Identifiants déjà vus côté client (ex. MMKV) ; si vide, lecture cache puis `user_post_views`.
@@ -94,6 +101,8 @@ class FetchPostService
 
         $items = $query->get()->map(function (object $row): object {
             $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+            $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
+            $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
 
             return $row;
         });
@@ -228,6 +237,8 @@ class FetchPostService
             ->map(function (object $row): object {
                 $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
                 $row->distance_km = (int) round((float) $row->distance_km);
+                $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
+                $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
 
                 return $row;
             });
@@ -353,6 +364,8 @@ class FetchPostService
             ->map(function (object $row): object {
                 $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
                 $row->distance_km = (int) round((float) $row->distance_km);
+                $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
+                $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
 
                 return $row;
             });
@@ -410,6 +423,234 @@ class FetchPostService
             'items' => $items,
             'count' => $items->count(),
         ];
+    }
+
+    /**
+     * Feed `Fil d'actu` séparé : posts réguliers uniquement, jamais mélangés avec `match_results`.
+     *
+     * @param  array<int, int>  $clientViewedRegularPostIds
+     * @return array{items: Collection<int, object>, count: int}
+     */
+    public function fetchRegularPostFeedOrdered(int $viewerUserId, array $clientViewedRegularPostIds): array
+    {
+        $target = self::REGULAR_POST_TARGET;
+        $viewedIds = $this->resolveViewedRegularPostIds($viewerUserId, $clientViewedRegularPostIds);
+
+        $items = $this->fetchRegularPostsFromFollowing($viewerUserId, $viewedIds, [], $target)->values();
+        $seenIds = $items->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+
+        if ($items->count() < $target) {
+            $remaining = $target - $items->count();
+            $centreItems = $this->fetchRegularPostsFromCentreInteret($viewerUserId, $viewedIds, $seenIds, $remaining);
+
+            $items = $items->concat($centreItems)->take($target)->values();
+            $seenIds = $items->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+        }
+
+        if ($items->count() < $target) {
+            $remaining = $target - $items->count();
+            $recentItems = $this->fetchRecentRegularPosts($viewerUserId, $viewedIds, $seenIds, $remaining);
+
+            $items = $items->concat($recentItems)->take($target)->values();
+        }
+
+        $this->storeViewedRegularPostIds($viewerUserId, $items);
+
+        return [
+            'items' => $items,
+            'count' => $items->count(),
+        ];
+    }
+
+    /**
+     * @param  array<int, int>  $viewedIds
+     * @param  array<int, int>  $excludedPostIds
+     * @return Collection<int, object>
+     */
+    private function fetchRegularPostsFromFollowing(int $viewerUserId, array $viewedIds, array $excludedPostIds, int $limit): Collection
+    {
+        $followingIds = $this->resolveFollowingIds($viewerUserId);
+        if ($followingIds === []) {
+            return collect();
+        }
+
+        $query = $this->regularPostBaseQuery($viewerUserId)
+            ->whereIn('posts.user_id', $followingIds)
+            ->whereIn('posts.visibility', ['public', 'followers'])
+            ->addSelect(DB::raw("'amis' AS tag"));
+
+        $this->applyRegularPostExclusions($query, $viewedIds, $excludedPostIds);
+
+        return $this->attachMediaToRegularPosts(
+            $query
+                ->orderByDesc('posts.published_at')
+                ->orderByDesc('posts.id')
+                ->limit($limit)
+                ->get()
+        );
+    }
+
+    /**
+     * @param  array<int, int>  $viewedIds
+     * @param  array<int, int>  $excludedPostIds
+     * @return Collection<int, object>
+     */
+    private function fetchRegularPostsFromCentreInteret(int $viewerUserId, array $viewedIds, array $excludedPostIds, int $limit): Collection
+    {
+        $viewerSportIds = $this->resolveViewerSportIds($viewerUserId);
+        if ($viewerSportIds === []) {
+            return collect();
+        }
+
+        $followingIds = $this->resolveFollowingIds($viewerUserId);
+
+        $query = $this->regularPostBaseQuery($viewerUserId)
+            ->where('posts.user_id', '<>', $viewerUserId)
+            ->where('posts.visibility', 'public')
+            ->whereExists(function ($exists) use ($viewerSportIds): void {
+                $exists->from('user_sports')
+                    ->whereColumn('user_sports.user_id', 'posts.user_id')
+                    ->whereIn('user_sports.sport_id', $viewerSportIds);
+            })
+            ->addSelect(DB::raw("'".self::CENTRE_INTERET_TAG."' AS tag"));
+
+        if ($followingIds !== []) {
+            $query->whereNotIn('posts.user_id', $followingIds);
+        }
+
+        $this->applyRegularPostExclusions($query, $viewedIds, $excludedPostIds);
+
+        return $this->attachMediaToRegularPosts(
+            $query
+                ->orderByDesc('posts.published_at')
+                ->orderByDesc('posts.id')
+                ->limit($limit)
+                ->get()
+        );
+    }
+
+    /**
+     * @param  array<int, int>  $viewedIds
+     * @param  array<int, int>  $excludedPostIds
+     * @return Collection<int, object>
+     */
+    private function fetchRecentRegularPosts(int $viewerUserId, array $viewedIds, array $excludedPostIds, int $limit): Collection
+    {
+        $query = $this->regularPostBaseQuery($viewerUserId)
+            ->where('posts.user_id', '<>', $viewerUserId)
+            ->where('posts.visibility', 'public')
+            ->addSelect(DB::raw("'recent' AS tag"));
+
+        $this->applyRegularPostExclusions($query, $viewedIds, $excludedPostIds);
+
+        return $this->attachMediaToRegularPosts(
+            $query
+                ->orderByDesc('posts.published_at')
+                ->orderByDesc('posts.id')
+                ->limit($limit)
+                ->get()
+        );
+    }
+
+    private function regularPostBaseQuery(int $viewerUserId): Builder
+    {
+        $viewerLikesSub = DB::table('post_likes')
+            ->select('publication_id')
+            ->where('users_id', $viewerUserId)
+            ->where('publication_type', self::PUBLICATION_TYPE_REGULAR);
+
+        return DB::table('posts')
+            ->join('users as authors', 'authors.id', '=', 'posts.user_id')
+            ->leftJoin('user_profiles as author_profiles', 'author_profiles.user_id', '=', 'posts.user_id')
+            ->leftJoinSub($viewerLikesSub, 'viewer_regular_likes', function ($join): void {
+                $join->on('viewer_regular_likes.publication_id', '=', 'posts.id');
+            })
+            ->where('posts.status', self::REGULAR_POST_FEED_STATUS)
+            ->whereNull('posts.deleted_at')
+            ->select([
+                'posts.id',
+                DB::raw("'".self::PUBLICATION_TYPE_REGULAR."' AS publication_type"),
+                'posts.user_id',
+                'posts.body',
+                'posts.visibility',
+                'posts.status',
+                'posts.media_count',
+                'posts.total_likes',
+                'posts.total_comments',
+                'posts.total_shares',
+                'posts.published_at',
+                'posts.created_at',
+                'posts.updated_at',
+                'authors.name as author_name',
+                'author_profiles.display_name as author_display_name',
+                'author_profiles.handle as author_handle',
+                'author_profiles.avatar_url as author_avatar_url',
+                'author_profiles.avatar_blurhash as author_avatar_blurhash',
+                DB::raw('viewer_regular_likes.publication_id IS NOT NULL AS viewer_has_liked'),
+            ]);
+    }
+
+    /**
+     * @param  array<int, int>  $viewedIds
+     * @param  array<int, int>  $excludedPostIds
+     */
+    private function applyRegularPostExclusions(Builder $query, array $viewedIds, array $excludedPostIds): void
+    {
+        $blockedPostIds = collect($viewedIds)
+            ->concat($excludedPostIds)
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($blockedPostIds !== []) {
+            $query->whereNotIn('posts.id', $blockedPostIds);
+        }
+    }
+
+    /**
+     * @param  Collection<int, object>  $items
+     * @return Collection<int, object>
+     */
+    private function attachMediaToRegularPosts(Collection $items): Collection
+    {
+        if ($items->isEmpty()) {
+            return $items;
+        }
+
+        $postIds = $items
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $mediaByPostId = DB::table('post_media')
+            ->whereIn('post_id', $postIds)
+            ->orderBy('position')
+            ->get()
+            ->groupBy(static fn (object $media): int => (int) $media->post_id);
+
+        return $items->map(function (object $row) use ($mediaByPostId): object {
+            $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+            $row->author_avatar_url = PublicImageUrl::from($row->author_avatar_url);
+            $row->media_count = (int) ($row->media_count ?? 0);
+            $row->total_likes = (int) ($row->total_likes ?? 0);
+            $row->total_comments = (int) ($row->total_comments ?? 0);
+            $row->total_shares = (int) ($row->total_shares ?? 0);
+            $row->media = $mediaByPostId
+                ->get((int) $row->id, collect())
+                ->map(static fn (object $media): array => [
+                    'id' => (int) $media->id,
+                    'position' => (int) $media->position,
+                    'path' => PublicImageUrl::from($media->path),
+                    'blurhash' => $media->blurhash,
+                    'alt_text' => $media->alt_text,
+                ])
+                ->values()
+                ->all();
+
+            return $row;
+        });
     }
 
     /**
@@ -562,6 +803,101 @@ class FetchPostService
         );
 
         $cacheKey = $this->viewedMatchResultsCacheKey($viewerUserId);
+        $cachedIds = collect(Cache::store('app_main_cache')->get($cacheKey, []))
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->all();
+
+        $mergedIds = collect($cachedIds)
+            ->concat($viewedIds)
+            ->unique()
+            ->values()
+            ->all();
+
+        Cache::store('app_main_cache')->forever($cacheKey, $mergedIds);
+    }
+
+    /**
+     * @param  array<int, int>  $clientViewedRegularPostIds
+     * @return array<int, int>
+     */
+    public function resolveViewedRegularPostIds(int $viewerUserId, array $clientViewedRegularPostIds): array
+    {
+        $normalized = collect($clientViewedRegularPostIds)
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($normalized !== []) {
+            return $normalized;
+        }
+
+        $cacheKey = $this->viewedRegularPostsCacheKey($viewerUserId);
+
+        if (Cache::store('app_main_cache')->has($cacheKey)) {
+            return collect(Cache::store('app_main_cache')->get($cacheKey, []))
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->filter(static fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $viewedIds = DB::table('user_post_views')
+            ->where('user_id', $viewerUserId)
+            ->where('publication_type', self::PUBLICATION_TYPE_REGULAR)
+            ->pluck('publication_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        Cache::store('app_main_cache')->forever($cacheKey, $viewedIds);
+
+        return $viewedIds;
+    }
+
+    private function viewedRegularPostsCacheKey(int $userId): string
+    {
+        return 'user_post_views:regular_posts:'.$userId;
+    }
+
+    /**
+     * @param  Collection<int, object>  $items
+     */
+    private function storeViewedRegularPostIds(int $viewerUserId, Collection $items): void
+    {
+        $viewedIds = $items
+            ->pluck('id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($viewedIds === []) {
+            return;
+        }
+
+        $now = now();
+        $rows = array_map(
+            static fn (int $id): array => [
+                'user_id' => $viewerUserId,
+                'publication_id' => $id,
+                'publication_type' => self::PUBLICATION_TYPE_REGULAR,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            $viewedIds,
+        );
+
+        DB::table('user_post_views')->upsert(
+            $rows,
+            ['user_id', 'publication_id', 'publication_type'],
+            ['updated_at']
+        );
+
+        $cacheKey = $this->viewedRegularPostsCacheKey($viewerUserId);
         $cachedIds = collect(Cache::store('app_main_cache')->get($cacheKey, []))
             ->map(static fn (mixed $id): int => (int) $id)
             ->filter(static fn (int $id): bool => $id > 0)
