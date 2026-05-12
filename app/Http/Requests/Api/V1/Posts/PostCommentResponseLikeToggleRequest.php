@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Api\V1\Posts;
 
+use App\Http\Requests\Api\V1\Posts\Concerns\ValidatesPostPublication;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class PostCommentResponseLikeToggleRequest extends FormRequest
 {
+    use ValidatesPostPublication;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -18,22 +20,18 @@ class PostCommentResponseLikeToggleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'post_id' => ['required', 'integer', 'exists:match_results,id'],
+            'post_type' => ['required', 'string', 'in:regular,automatic'],
+            'post_id' => ['required', 'integer', $this->publicationExistsRule()],
             'comment_id' => [
                 'required',
                 'integer',
-                Rule::exists('comments', 'id')->where(function ($query): void {
-                    $query->where('publication_id', (int) $this->route('post_id'));
-                }),
+                $this->commentExistsForPublicationRule(),
             ],
             'response_id' => [
                 'required',
                 'integer',
-                Rule::exists('response_commentaires', 'id')->where(function ($query): void {
-                    $query->where('comment_id', (int) $this->route('comment_id'));
-                }),
+                $this->responseExistsForCommentRule(),
             ],
-            'post_type' => ['required', 'string', 'in:regular,automatic'],
             'action' => ['required', 'string', 'in:like,dislike'],
         ];
     }

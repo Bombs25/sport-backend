@@ -63,7 +63,7 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
             return;
         }
 
-        $now = now();
+        $now = Carbon::now();
         $handlesByUserId = $this->handlesForUsers($userIds);
 
         $homeCaptainId = $userIds[0];
@@ -494,7 +494,6 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
         array $handlesByUserId,
         Carbon $now,
     ): void {
-        $pubRegular = 'regular';
         $pubAuto = 'automatic';
 
         $authorA = $userIds[2];
@@ -504,7 +503,7 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
         $c1 = (int) DB::table('comments')->insertGetId([
             'content' => 'Super match, félicitations aux deux équipes !',
             'publication_id' => $publicationId,
-            'publication_type' => $pubRegular,
+            'publication_type' => $pubAuto,
             'user_id' => $authorA,
             'responses_count' => 0,
             'likes_count' => 0,
@@ -515,7 +514,7 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
         $c2 = (int) DB::table('comments')->insertGetId([
             'content' => 'Le dernier but était magnifique.',
             'publication_id' => $publicationId,
-            'publication_type' => $pubRegular,
+            'publication_type' => $pubAuto,
             'user_id' => $authorB,
             'responses_count' => 0,
             'likes_count' => 0,
@@ -606,7 +605,7 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
      */
     private function seedPostLikes(int $matchResultId, array $userIds, Carbon $now): void
     {
-        $pub = 'regular';
+        $pub = 'automatic';
         $likers = array_slice($userIds, 10, min(15, count($userIds) - 10));
         foreach ($likers as $uid) {
             DB::table('post_likes')->insert([

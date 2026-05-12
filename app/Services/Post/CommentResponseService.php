@@ -101,12 +101,10 @@ class CommentResponseService
                 ->where('responses_count', '>', 0)
                 ->decrement('responses_count');
 
-            if ((string) $comment->publication_type === 'automatic') {
-                DB::table('match_results')
-                    ->where('id', $publicationId)
-                    ->where('total_comments', '>', 0)
-                    ->decrement('total_comments');
-            }
+            DB::table((string) $comment->publication_type === 'regular' ? 'posts' : 'match_results')
+                ->where('id', $publicationId)
+                ->where('total_comments', '>', 0)
+                ->decrement('total_comments');
         });
     }
 }

@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             DemoMatchCalendarSeeder::class,
             DemoMatchSocialInteractionsSeeder::class,
             DemoBulkMatchResultsSeeder::class,
+            DemoRegularPostsSeeder::class,
             StatsFromMatchResultsSeeder::class,
             DemoNotificationsSeeder::class,
         ]);

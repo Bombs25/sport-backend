@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 class MatchResultLikeService
 {
     /**
-     * Applique un like/dislike (retrait du like) sur un résultat de match de manière transactionnelle (ACID).
+     * Applique un like/dislike (retrait du like) sur une publication de manière transactionnelle (ACID).
      *
      * @return array{liked: bool, changed: bool, likes_count: int, submitted_by_user_id: int}
      *
@@ -21,14 +21,15 @@ class MatchResultLikeService
         string $action,
     ): array {
         return DB::transaction(function () use ($publicationId, $userId, $publicationType, $action): array {
-            $result = DB::table('match_results')
+            $publicationTable = $publicationType === 'regular' ? 'posts' : 'match_results';
+            $publication = DB::table($publicationTable)
                 ->where('id', $publicationId)
                 ->lockForUpdate()
                 ->first();
 
-            if ($result === null) {
+            if ($publication === null) {
                 throw ValidationException::withMessages([
-                    'post_id' => __('Résultat de match introuvable.'),
+                    'post_id' => 'Publication introuvable.',
                 ]);
             }
 
@@ -39,7 +40,7 @@ class MatchResultLikeService
                 ->lockForUpdate()
                 ->first();
 
-            $likesCount = (int) $result->total_likes;
+            $likesCount = (int) $publication->total_likes;
             $liked = $existingLike !== null;
             $changed = false;
 
@@ -53,7 +54,7 @@ class MatchResultLikeService
                         'updated_at' => now(),
                     ]);
 
-                    DB::table('match_results')
+                    DB::table($publicationTable)
                         ->where('id', $publicationId)
                         ->increment('total_likes');
 
@@ -69,7 +70,7 @@ class MatchResultLikeService
                         ->where('publication_type', $publicationType)
                         ->delete();
 
-                    DB::table('match_results')
+                    DB::table($publicationTable)
                         ->where('id', $publicationId)
                         ->where('total_likes', '>', 0)
                         ->decrement('total_likes');
@@ -86,7 +87,9 @@ class MatchResultLikeService
                 'liked' => $liked,
                 'changed' => $changed,
                 'likes_count' => $likesCount,
-                'submitted_by_user_id' => (int) $result->submitted_by_user_id,
+                'submitted_by_user_id' => $publicationType === 'regular'
+                    ? (int) $publication->user_id
+                    : (int) $publication->submitted_by_user_id,
             ];
         });
     }

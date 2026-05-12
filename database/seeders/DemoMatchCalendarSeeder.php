@@ -251,7 +251,7 @@ class DemoMatchCalendarSeeder extends Seeder
         int $userB,
         CarbonInterface $now,
     ): void {
-        $pub = 'regular';
+        $pub = 'automatic';
 
         $c1 = (int) DB::table('comments')->insertGetId([
             'content' => 'Bel échange sur ce match de calendrier démo.',

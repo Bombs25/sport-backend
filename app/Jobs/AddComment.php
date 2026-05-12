@@ -37,7 +37,7 @@ class AddComment implements ShouldQueue
                 $this->content,
             );
 
-            DB::table('match_results')
+            DB::table($this->publicationType === 'regular' ? 'posts' : 'match_results')
                 ->where('id', $this->publicationId)
                 ->increment('total_comments');
 

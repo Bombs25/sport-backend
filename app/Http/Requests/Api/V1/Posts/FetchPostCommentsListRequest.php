@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests\Api\V1\Posts;
 
+use App\Http\Requests\Api\V1\Posts\Concerns\ValidatesPostPublication;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
 
 class FetchPostCommentsListRequest extends FormRequest
 {
+    use ValidatesPostPublication;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -18,8 +21,8 @@ class FetchPostCommentsListRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'publication_id' => ['required', 'integer', 'min:1', 'exists:match_results,id'],
             'publication_type' => ['required', 'string', 'in:regular,automatic'],
+            'publication_id' => ['required', 'integer', 'min:1', $this->publicationExistsRule('publication_id', 'publication_type')],
             'page' => ['sometimes', 'integer', 'min:1'],
         ];
     }

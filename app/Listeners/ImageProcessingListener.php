@@ -183,8 +183,10 @@ class ImageProcessingListener
 
                 if ($eventType === 'team') {
                     $this->addFilesRepository->addTeamFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
-                }elseif ($eventType === 'profile') {
+                } elseif ($eventType === 'profile') {
                     $this->addFilesRepository->addProfileFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
+                } elseif ($eventType === 'post') {
+                    $this->addFilesRepository->addPostFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
                 }
 
                 Log::info('Image processing batch finished.');

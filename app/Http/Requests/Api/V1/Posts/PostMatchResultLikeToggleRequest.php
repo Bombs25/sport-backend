@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Api\V1\Posts;
 
+use App\Http\Requests\Api\V1\Posts\Concerns\ValidatesPostPublication;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PostMatchResultLikeToggleRequest extends FormRequest
 {
+    use ValidatesPostPublication;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -17,8 +20,8 @@ class PostMatchResultLikeToggleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'post_id' => ['required', 'integer', 'exists:match_results,id'],
             'post_type' => ['required', 'string', 'in:regular,automatic'],
+            'post_id' => ['required', 'integer', $this->publicationExistsRule()],
             'action' => ['required', 'string', 'in:like,dislike'],
         ];
     }

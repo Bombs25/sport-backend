@@ -91,4 +91,55 @@ class AddFilesRepository
             ]);
         }
     }
+
+    /**
+     * @param  list<string>  $blurhashes
+     * @param  array<string, mixed>|list<mixed>|string|null  $convertPaths
+     */
+    public function addPostFilesUrlToDb(array $blurhashes, array|string|null $convertPaths, ?int $postId): void
+    {
+        $paths = $convertPaths;
+        if (is_string($paths)) {
+            $decoded = json_decode($paths, true);
+            $paths = is_array($decoded) ? $decoded : [];
+        }
+        if (! is_array($paths)) {
+            $paths = [];
+        }
+
+        $now = now();
+        $rows = [];
+        foreach (array_values($paths) as $position => $path) {
+            if (! is_string($path) || $path === '') {
+                continue;
+            }
+
+            $rows[] = [
+                'post_id' => (int) $postId,
+                'position' => $position,
+                'path' => $path,
+                'blurhash' => $blurhashes[$position] ?? null,
+                'alt_text' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        DB::transaction(function () use ($postId, $rows): void {
+            if ($rows !== []) {
+                DB::table('post_media')->upsert(
+                    $rows,
+                    ['post_id', 'position'],
+                    ['path', 'blurhash', 'alt_text', 'updated_at'],
+                );
+            }
+
+            DB::table('posts')
+                ->where('id', (int) $postId)
+                ->update([
+                    'media_count' => count($rows),
+                    'updated_at' => now(),
+                ]);
+        });
+    }
 }

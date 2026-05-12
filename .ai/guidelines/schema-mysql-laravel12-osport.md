@@ -697,7 +697,7 @@ return new class extends Migration
 
 ### 5.13 `posts`
 
-Publications du fil ; `match_result_id` **unique nullable** lie le post automatique au score validé.
+Publications régulières du fil utilisateur : texte, médias et compteurs d'interactions. Les posts automatiques de score validé restent portés par le flux `match_results` existant et ne sont pas liés à cette table.
 
 ```php
 <?php
@@ -713,18 +713,19 @@ return new class extends Migration
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('team_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('match_result_id')->nullable()->constrained('match_results')->nullOnDelete();
-            $table->string('kind', 32)->default('text')->index();
-            // text | media | score_validated | ...
             $table->text('body')->nullable();
             $table->string('visibility', 24)->default('public'); // public | followers
+            $table->string('status', 24)->default('published')->index(); // draft | published | archived
+            $table->unsignedTinyInteger('media_count')->default(0);
+            $table->unsignedInteger('total_likes')->default(0);
+            $table->unsignedInteger('total_comments')->default(0);
+            $table->unsignedInteger('total_shares')->default(0);
+            $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique('match_result_id'); // au plus un post « score » par résultat
-            $table->index(['user_id', 'created_at']);
-            $table->index(['team_id', 'created_at']);
+            $table->index(['user_id', 'published_at']);
+            $table->index(['visibility', 'status', 'published_at']);
         });
     }
 
@@ -737,7 +738,7 @@ return new class extends Migration
 
 ### 5.14 `post_media`
 
-Médias du carrousel ; charge paresseuse possible côté API.
+Médias du carrousel (ex. indicateur `1/3` côté client) ; charge paresseuse possible côté API.
 
 ```php
 <?php
@@ -754,13 +755,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('post_id')->constrained()->cascadeOnDelete();
             $table->unsignedTinyInteger('position')->default(0);
-            $table->string('disk', 32)->default('public');
             $table->string('path', 1024);
-            $table->string('mime', 128)->nullable();
-            $table->string('type', 16)->default('image'); // image | video
+            $table->string('blurhash', 255)->nullable();
+            $table->string('alt_text', 255)->nullable();
             $table->timestamps();
 
-            $table->index(['post_id', 'position']);
+            $table->unique(['post_id', 'position']);
         });
     }
 

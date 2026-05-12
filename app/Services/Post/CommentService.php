@@ -69,7 +69,7 @@ class CommentService
                 ->where('id', $commentId)
                 ->increment('responses_count');
 
-            DB::table('match_results')
+            DB::table($publicationType === 'regular' ? 'posts' : 'match_results')
                 ->where('id', $publicationId)
                 ->increment('total_comments');
 
@@ -133,12 +133,10 @@ class CommentService
                 ->where('id', $commentId)
                 ->delete();
 
-            if ((string) $comment->publication_type === 'automatic') {
-                DB::table('match_results')
-                    ->where('id', (int) $comment->publication_id)
-                    ->where('total_comments', '>', 0)
-                    ->decrement('total_comments');
-            }
+            DB::table((string) $comment->publication_type === 'regular' ? 'posts' : 'match_results')
+                ->where('id', (int) $comment->publication_id)
+                ->where('total_comments', '>', 0)
+                ->decrement('total_comments');
         });
     }
 }
