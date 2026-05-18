@@ -3,12 +3,14 @@
 namespace App\Listeners;
 
 use App\Contracts\Files\ImageProcessingInterface;
+use App\Events\FileUploadBroadcast;
 use App\Events\ImageProcessingEvent;
 use App\Http\Requests\Api\V1\Images\ImageProcessingStoreRequest;
 use App\Jobs\CompressImageJob;
 use App\Jobs\ConvertImageJob;
 use App\Jobs\GenerateBlurHashJob;
 use App\Jobs\ImageProcessingQueue;
+use App\Models\User;
 use App\Repositories\AddFilesRepository;
 use App\Support\ImagePipelineResultCache;
 use Illuminate\Bus\Batch;
@@ -127,8 +129,10 @@ class ImageProcessingListener
         ])
             ->before(function (Batch $batch) {
                 // The batch has been created but no jobs have been added...
-            })->progress(function (Batch $batch) use ($batchKey, $userId) {
+            })->progress(function (Batch $batch) use ($batchKey, $userId, $user) {
                 $payload = self::batchProgressPayload($batch);
+
+                self::publishUploadProgress($user, $batchKey, $payload, 'progress');
 
                 Cache::put(
                     ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id),
@@ -150,14 +154,24 @@ class ImageProcessingListener
                 //     'name' => $batch->name,
                 //     'total_jobs' => $batch->totalJobs,
                 // ]);
-            })->catch(function (Batch $batch, Throwable $e) {
+            })->catch(function (Batch $batch, Throwable $e) use ($user, $batchKey) {
                 Log::error('Image processing batch failed.', [
                     'batch_id' => $batch->id,
                     'name' => $batch->name,
                     'total_jobs' => $batch->totalJobs,
                     'error' => $e->getMessage(),
                 ]);
-            })->finally(function (Batch $batch) use ($batchKey, $userId, $variant, $stagingRoot, $dedupKey, $eventType, $contextId) {
+
+                self::publishUploadProgress($user, $batchKey, [
+                    'batch_id' => $batch->id,
+                    'percent' => $batch->progress(),
+                    'processed_jobs' => $batch->processedJobs(),
+                    'total_jobs' => $batch->totalJobs,
+                    'pending_jobs' => $batch->pendingJobs,
+                    'failed_jobs' => $batch->failedJobs,
+                    'progress_bar' => null,
+                ], 'failed');
+            })->finally(function (Batch $batch) use ($batchKey, $userId, $variant, $stagingRoot, $dedupKey, $eventType, $contextId, $user) {
                 Cache::forget($dedupKey);
 
                 self::removeStagingTree($stagingRoot, $batchKey);
@@ -191,6 +205,17 @@ class ImageProcessingListener
 
                 Log::info('Image processing batch finished.');
 
+                self::publishUploadProgress($user, $batchKey, [
+                    'batch_id' => $batch->id,
+                    'percent' => 100,
+                    'processed_jobs' => $batch->totalJobs,
+                    'total_jobs' => $batch->totalJobs,
+                    'pending_jobs' => 0,
+                    'failed_jobs' => $batch->failedJobs,
+                    'progress_bar' => '['.str_repeat('█', 24).'] 100%',
+                ], 'completed');
+
+                // Garder latestForUserKey pour le polling WebView (TTL 30 min dans publishUploadProgress).
                 Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id));
                 Cache::forget($blurKey);
                 Cache::forget($convertKey);
@@ -229,6 +254,26 @@ class ImageProcessingListener
      *     progress_bar: string
      * }
      */
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private static function publishUploadProgress(User $user, string $batchKey, array $payload, string $status): void
+    {
+        $envelope = array_merge($payload, [
+            'status' => $status,
+            'user_id' => $user->id,
+            'batch_key' => $batchKey,
+        ]);
+
+        Cache::put(
+            ImagePipelineResultCache::latestForUserKey($user->id),
+            $envelope,
+            now()->addMinutes(30),
+        );
+
+        FileUploadBroadcast::dispatch($user, $payload, $status);
+    }
+
     private static function batchProgressPayload(Batch $batch): array
     {
         $percent = $batch->progress();

@@ -28,6 +28,13 @@ Route::get('/billing/checkout/return', function (Request $request) {
 })->name('billing.checkout.return');
 
 /*
+| WebView React Native : écoute Reverb sur le canal privé file.upload.progress.{userId}.
+| Query : token (Sanctum, sans préfixe Bearer). Optionnel : theme=light|dark.
+*/
+Route::view('/mobile/upload-progress', 'mobile.upload-progress')
+    ->name('mobile.upload-progress');
+
+/*
 | Page de test multipart + Sanctum stateful (local uniquement). Doit passer par le groupe `web`
 | (session + CSRF) pour que le meta token et les cookies de session soient cohérents avec l’API.
 */

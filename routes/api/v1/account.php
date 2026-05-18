@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
 use App\Http\Controllers\Api\V1\Profile\UserPublicProfileController;
 use App\Http\Controllers\Api\V1\Search\UserNearbySearchController;
+use App\Http\Controllers\Api\V1\Upload\UploadProgressPollController;
 use App\Http\Controllers\Api\V1\Users\CurrentUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // Récupère le profil de l'utilisateur connecté (même format que login / register).
     Route::get('user', CurrentUserController::class);
+    Route::get('upload-progress', UploadProgressPollController::class)->middleware('throttle:auth-follow-read');
     // Met à jour le profil utilisateur (nom, bio, confidentialité, localisation, etc.).
     Route::patch('profile', UpdateProfileController::class);
     // Notifications en base (10 par page, query `page`).

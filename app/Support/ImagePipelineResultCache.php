@@ -21,6 +21,12 @@ final class ImagePipelineResultCache
         return "image-pipeline:progress:{$uniqueKey}:{$userId}:{$batchId}";
     }
 
+    /** Dernière progression connue pour un utilisateur (polling WebView). */
+    public static function latestForUserKey(int $userId): string
+    {
+        return "upload-progress:latest:{$userId}";
+    }
+
     public static function blurhashKey(string $uniqueKey, int $userId, string $batchId): string
     {
         return "image-pipeline:result:blurhash:{$uniqueKey}:{$userId}:{$batchId}";

@@ -17,3 +17,15 @@ require __DIR__.'/api/v1/billing.php';
 // Équipes : CRUD sous `/api/v1/auth/teams...`.
 require __DIR__.'/api/v1/teams.php';
 require __DIR__.'/api/v1/posts.php';
+
+/*
+| Auth WebSocket (Reverb) : Bearer Sanctum uniquement (WebView RN).
+| Sans middleware « stateful » Sanctum : évite 403 si cookies session ≠ token.
+*/
+use Illuminate\Broadcasting\BroadcastController;
+use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
+
+Route::post('broadcasting/auth', [BroadcastController::class, 'authenticate'])
+    ->middleware('auth:sanctum')
+    ->withoutMiddleware([EnsureFrontendRequestsAreStateful::class]);
