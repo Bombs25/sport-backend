@@ -3,6 +3,9 @@
 use App\Http\Controllers\Api\V1\Follow\FollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\FollowDestroyController;
 use App\Http\Controllers\Api\V1\Follow\FollowListController;
+use App\Http\Controllers\Api\V1\Follow\FollowRequestAcceptController;
+use App\Http\Controllers\Api\V1\Follow\FollowRequestListController;
+use App\Http\Controllers\Api\V1\Follow\FollowRequestRejectController;
 use App\Http\Controllers\Api\V1\Follow\FollowStoreController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
@@ -34,6 +37,10 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('follows/counts', FollowCountsController::class)->middleware('throttle:auth-follow-read');
     // Liste followers ou following du compte connecté (query : type, limit, cursor ; FlatList).
     Route::get('follows', FollowListController::class)->middleware('throttle:auth-follow-read');
+    // Demandes de suivi entrantes (compte privé) — liste paginée.
+    Route::get('follow-requests', FollowRequestListController::class)->middleware('throttle:auth-follow-read');
+    Route::post('follow-requests/accept', FollowRequestAcceptController::class)->middleware('throttle:auth-follow-write');
+    Route::post('follow-requests/reject', FollowRequestRejectController::class)->middleware('throttle:auth-follow-write');
     // Recherche de profils publics autour de la localisation du profil connecté.
     Route::get('users/search', UserNearbySearchController::class)->middleware('throttle:auth-follow-read');
     // Profil public d'un utilisateur (id) : e-mail masqué sauf soi-même ; comptes privés si non autorisé.

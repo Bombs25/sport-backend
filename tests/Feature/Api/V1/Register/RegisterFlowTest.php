@@ -22,6 +22,29 @@ class RegisterFlowTest extends TestCase
         return 'Str0ng!Pass';
     }
 
+    public function test_register_credentials_stores_fcm_token_when_provided(): void
+    {
+        $password = $this->validPassword();
+
+        $this->postJson('/api/v1/auth/register/credentials', [
+            'email' => 'push@example.com',
+            'password' => $password,
+            'password_confirmation' => $password,
+            'accept_terms' => true,
+            'given_name' => 'Jean',
+            'family_name' => 'Dupont',
+            'city' => 'Lyon',
+            'latitude' => 45.7640,
+            'longitude' => 4.8357,
+            'fcm_token' => 'fcm-device-token-abc123',
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'push@example.com',
+            'fcm_token' => 'fcm-device-token-abc123',
+        ]);
+    }
+
     public function test_register_wizard_completes_with_sanctum_token(): void
     {
         $password = $this->validPassword();

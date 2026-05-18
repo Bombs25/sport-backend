@@ -181,6 +181,124 @@ class FollowSystemTest extends TestCase
             'Authorization' => 'Bearer '.$token,
         ])->assertOk()
             ->assertJsonPath('data.followers_count', 2)
-            ->assertJsonPath('data.following_count', 1);
+            ->assertJsonPath('data.following_count', 1)
+            ->assertJsonPath('data.pending_requests_count', 0);
+    }
+
+    public function test_follow_private_profile_creates_pending_request(): void
+    {
+        $privateUser = User::factory()->create();
+        $follower = User::factory()->create();
+        $token = $follower->createToken('auth')->plainTextToken;
+
+        DB::table('user_profiles')->insert([
+            'user_id' => $privateUser->id,
+            'handle' => 'private_user',
+            'display_name' => 'Private User',
+            'is_private' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/auth/follow', [
+            'target_user_id' => $privateUser->id,
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'pending');
+
+        $this->assertDatabaseHas('follows', [
+            'follower_id' => $follower->id,
+            'following_id' => $privateUser->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_private_user_can_list_accept_and_reject_follow_requests(): void
+    {
+        $privateUser = User::factory()->create();
+        $requester = User::factory()->create();
+        $privateToken = $privateUser->createToken('auth')->plainTextToken;
+
+        foreach ([$privateUser, $requester] as $user) {
+            DB::table('user_profiles')->insert([
+                'user_id' => $user->id,
+                'handle' => 'user_'.$user->id,
+                'display_name' => 'User '.$user->id,
+                'is_private' => $user->id === $privateUser->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $followRowId = DB::table('follows')->insertGetId([
+            'follower_id' => $requester->id,
+            'following_id' => $privateUser->id,
+            'status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/v1/auth/follows/counts', [
+            'Authorization' => 'Bearer '.$privateToken,
+        ])->assertOk()
+            ->assertJsonPath('data.pending_requests_count', 1);
+
+        $this->getJson('/api/v1/auth/follow-requests', [
+            'Authorization' => 'Bearer '.$privateToken,
+        ])->assertOk()
+            ->assertJsonPath('data.0.id', $followRowId)
+            ->assertJsonPath('data.0.user_id', $requester->id);
+
+        $this->postJson('/api/v1/auth/follow-requests/accept', [
+            'follow_request_id' => $followRowId,
+        ], [
+            'Authorization' => 'Bearer '.$privateToken,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('follows', [
+            'id' => $followRowId,
+            'status' => 'accepted',
+        ]);
+
+        $this->getJson('/api/v1/auth/follows/counts', [
+            'Authorization' => 'Bearer '.$privateToken,
+        ])->assertOk()
+            ->assertJsonPath('data.pending_requests_count', 0)
+            ->assertJsonPath('data.followers_count', 1);
+    }
+
+    public function test_private_user_can_reject_follow_request(): void
+    {
+        $privateUser = User::factory()->create();
+        $requester = User::factory()->create();
+        $privateToken = $privateUser->createToken('auth')->plainTextToken;
+
+        DB::table('user_profiles')->insert([
+            'user_id' => $privateUser->id,
+            'handle' => 'private_only',
+            'display_name' => 'Private Only',
+            'is_private' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $followRowId = DB::table('follows')->insertGetId([
+            'follower_id' => $requester->id,
+            'following_id' => $privateUser->id,
+            'status' => 'pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/auth/follow-requests/reject', [
+            'follow_request_id' => $followRowId,
+        ], [
+            'Authorization' => 'Bearer '.$privateToken,
+        ])->assertOk();
+
+        $this->assertDatabaseMissing('follows', [
+            'id' => $followRowId,
+        ]);
     }
 }

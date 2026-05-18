@@ -32,6 +32,7 @@ class RegisterCredentialsController extends Controller
             (float) $validated['longitude'],
             $validated['given_name'],
             $validated['family_name'],
+            $validated['fcm_token'] ?? null,
         );
 
         return response()->json([

@@ -30,14 +30,16 @@ class RegisterCredentialsService
         float $longitude,
         string $givenName,
         string $familyName,
+        ?string $fcmToken = null,
     ): array {
-        return DB::transaction(function () use ($email, $password, $city, $latitude, $longitude, $givenName, $familyName) {
+        return DB::transaction(function () use ($email, $password, $city, $latitude, $longitude, $givenName, $familyName, $fcmToken) {
             $civilName = trim($givenName.' '.$familyName);
 
             $user = User::query()->create([
                 'name' => $civilName,
                 'email' => $email,
                 'password' => $password,
+                'fcm_token' => $fcmToken,
             ]);
 
             $handle = $this->resolveUniqueHandle($givenName, $familyName);

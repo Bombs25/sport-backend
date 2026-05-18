@@ -58,7 +58,7 @@ class DemoUsersSeeder extends Seeder
     {
         $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 15_000)));
         $now = now();
-        $passwordHash = Hash::make('password');
+        $passwordHash = Hash::make('jimmyBulL1230$');
         $namePool = $this->buildNamePool();
 
         $sportIds = DB::table('sports')->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();

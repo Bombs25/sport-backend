@@ -22,6 +22,7 @@ class FileUploadBroadcast implements ShouldBroadcastNow
 
     /**
      * @param  array{
+     *     batch_key?: string,
      *     batch_id?: string,
      *     percent: int,
      *     processed_jobs?: int,
@@ -62,6 +63,7 @@ class FileUploadBroadcast implements ShouldBroadcastNow
             'failed_jobs' => $this->payload['failed_jobs'] ?? null,
             'progress_bar' => $this->payload['progress_bar'] ?? null,
             'batch_id' => $this->payload['batch_id'] ?? null,
+            'batch_key' => $this->payload['batch_key'] ?? null,
         ];
     }
 

@@ -38,7 +38,7 @@ class UpdateProfileRequest extends FormRequest
             'birth_date' => ['sometimes', 'nullable', 'date', 'before:today'],
             'bio' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'is_private' => ['sometimes', 'boolean'],
-            'avatar_url' => ['sometimes', 'nullable', 'file', 'image', new RasterImageFile],
+            'avatar_url' => ['sometimes', 'nullable', 'file', 'max:5120', new RasterImageFile],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'city' => ['sometimes', 'nullable', 'string', 'max:120'],

@@ -22,6 +22,7 @@ class FollowCountsController extends Controller
             'data' => [
                 'followers_count' => $counts['followers_count'],
                 'following_count' => $counts['following_count'],
+                'pending_requests_count' => $counts['pending_requests_count'],
             ],
         ]);
     }

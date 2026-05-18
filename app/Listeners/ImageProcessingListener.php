@@ -271,7 +271,7 @@ class ImageProcessingListener
             now()->addMinutes(30),
         );
 
-        FileUploadBroadcast::dispatch($user, $payload, $status);
+        FileUploadBroadcast::dispatch($user, array_merge($payload, ['batch_key' => $batchKey]), $status);
     }
 
     private static function batchProgressPayload(Batch $batch): array

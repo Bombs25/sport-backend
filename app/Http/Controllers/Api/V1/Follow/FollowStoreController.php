@@ -11,13 +11,18 @@ class FollowStoreController extends Controller
 {
     public function __invoke(FollowStoreRequest $request, FollowService $service): JsonResponse
     {
-        $service->follow(
+        $status = $service->follow(
             $request->user()->id,
             (int) $request->validated('target_user_id'),
         );
 
         return response()->json([
-            'message' => __('Abonnement enregistré.'),
+            'message' => $status === 'pending'
+                ? __('Demande de suivi envoyée.')
+                : __('Abonnement enregistré.'),
+            'data' => [
+                'status' => $status,
+            ],
         ]);
     }
 }

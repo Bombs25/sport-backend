@@ -33,6 +33,7 @@ class RegisterCredentialsRequest extends FormRequest
             'city' => ['required', 'string', 'max:120'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'fcm_token' => ['sometimes', 'nullable', 'string', 'max:512'],
         ];
     }
 
