@@ -35,6 +35,7 @@ class TeamStoreController extends Controller
             contextId: $team->id,
             variant: ImageVariantLongEdge::GridThumb,
             type: 'team',
+            mediaFields: ['cover_image_url', 'logo_url'],
         );
 
         $team->refresh();

@@ -22,6 +22,17 @@ final class PublicImageUrl
             return $path;
         }
 
-        return Storage::url($path);
+        return Storage::url(self::normalizeStoredPath($path));
+    }
+
+    private static function normalizeStoredPath(string $path): string
+    {
+        $relative = ltrim($path, '/');
+
+        if (Str::startsWith($relative, 'storage/')) {
+            $relative = Str::after($relative, 'storage/');
+        }
+
+        return $relative;
     }
 }

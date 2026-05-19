@@ -7,6 +7,7 @@ use App\Http\Requests\Api\V1\Search\TeamNearbySearchRequest;
 use App\Services\Search\TypesenseTeamService;
 use App\Support\UserProfileLocation;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Typesense\Exceptions\TypesenseClientError;
 
 class TeamNearbySearchController extends Controller
@@ -22,6 +23,13 @@ class TeamNearbySearchController extends Controller
             ], 422);
         }
 
+        $excludeTeamIds = DB::table('team_members')
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->pluck('team_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
         try {
             $results = $search->searchPublicTeamsAround(
                 latitude: $coordinates['latitude'],
@@ -33,6 +41,8 @@ class TeamNearbySearchController extends Controller
                 radiusKm: (float) ($request->validated('radius_km') ?? 100),
                 page: (int) ($request->validated('page') ?? 1),
                 perPage: (int) ($request->validated('per_page') ?? 10),
+                excludeCreatorId: $userId,
+                excludeTeamIds: $excludeTeamIds,
             );
         } catch (TypesenseClientError $e) {
             return response()->json([

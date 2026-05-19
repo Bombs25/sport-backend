@@ -41,4 +41,10 @@ final class ImagePipelineResultCache
     {
         return "image-pipeline:compressed:{$uniqueKey}:{$userId}:{$variant->value}:{$batchId}";
     }
+
+    /** @return list<string> */
+    public static function mediaFieldsKey(string $uniqueKey, int $userId, string $batchId): string
+    {
+        return "image-pipeline:media-fields:{$uniqueKey}:{$userId}:{$batchId}";
+    }
 }

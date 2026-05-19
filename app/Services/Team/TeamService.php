@@ -28,8 +28,10 @@ class TeamService
     public function listMine(int $userId): array
     {
         $createdTeams = DB::table('teams')
-            ->where('creator_id', $userId)
-            ->orderByDesc('created_at')
+            ->join('sports', 'sports.id', '=', 'teams.sport_id')
+            ->where('teams.creator_id', $userId)
+            ->select('teams.*', 'sports.name as sport_name', 'sports.slug as sport_slug')
+            ->orderByDesc('teams.created_at')
             ->get();
 
         $memberTeamIds = DB::table('team_members')
@@ -46,7 +48,12 @@ class TeamService
 
         $joinedTeams = $joinedIds === []
             ? collect()
-            : DB::table('teams')->whereIn('id', $joinedIds)->orderByDesc('created_at')->get();
+            : DB::table('teams')
+                ->join('sports', 'sports.id', '=', 'teams.sport_id')
+                ->whereIn('teams.id', $joinedIds)
+                ->select('teams.*', 'sports.name as sport_name', 'sports.slug as sport_slug')
+                ->orderByDesc('teams.created_at')
+                ->get();
 
         $countsMap = $this->activeMemberCountsForTeamIds(array_values(array_unique(array_merge(
             $createdIds,
@@ -169,7 +176,11 @@ class TeamService
      */
     public function deleteTeam(Team $team): void
     {
-        DB::table('teams')->where('id', $team->id)->delete();
+        $teamId = (int) $team->id;
+
+        $this->deleteTeamFromTypesense($teamId);
+
+        DB::table('teams')->where('id', $teamId)->delete();
     }
 
     private function syncTeamToTypesense(int $teamId): void
@@ -178,6 +189,18 @@ class TeamService
             $this->typesenseTeams->syncTeamFromDatabase($teamId);
         } catch (TypesenseClientError $e) {
             Log::warning('Typesense team sync failed.', [
+                'team_id' => $teamId,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function deleteTeamFromTypesense(int $teamId): void
+    {
+        try {
+            $this->typesenseTeams->deleteTeamFromIndex($teamId);
+        } catch (TypesenseClientError $e) {
+            Log::warning('Typesense team delete failed.', [
                 'team_id' => $teamId,
                 'message' => $e->getMessage(),
             ]);
@@ -445,8 +468,19 @@ class TeamService
             ->where('teams.id', $team->id)
             ->select([
                 'teams.id',
+                'teams.creator_id',
                 'teams.name',
+                'teams.slug',
+                'teams.description',
                 'teams.hq_city',
+                'teams.hq_latitude',
+                'teams.hq_longitude',
+                'teams.cover_image_url',
+                'teams.logo_url',
+                'teams.competition_type',
+                'teams.skill_level',
+                'teams.created_at',
+                'teams.updated_at',
                 'sports.id as sport_id',
                 'sports.name as sport_name',
                 'sports.slug as sport_slug',
@@ -482,35 +516,28 @@ class TeamService
             ])
             ->get();
 
-        return [
-            'id' => (int) $teamRow->id,
-            'name' => $teamRow->name,
-            'hq_city' => $teamRow->hq_city,
-            'sport' => [
-                'id' => (int) $teamRow->sport_id,
-                'name' => $teamRow->sport_name,
-                'slug' => $teamRow->sport_slug,
-                'practice_type' => $teamRow->sport_practice_type,
-            ],
-            'members_count' => $membersCount,
-            'members' => [
-                'items' => $memberRows
-                    ->map(static fn (object $row): array => [
-                        'user_id' => (int) $row->user_id,
-                        'name' => $row->name,
-                        'avatar_url' => PublicImageUrl::from($row->avatar_url),
-                        'role' => $row->role,
-                    ])
-                    ->values()
-                    ->all(),
-                'pagination' => [
-                    'current_page' => $safePage,
-                    'per_page' => $perPage,
-                    'total' => $membersCount,
-                    'last_page' => $lastPage,
+        return array_merge(
+            $this->formatDetailRow($teamRow, $membersCount),
+            [
+                'members' => [
+                    'items' => $memberRows
+                        ->map(static fn (object $row): array => [
+                            'user_id' => (int) $row->user_id,
+                            'name' => $row->name,
+                            'avatar_url' => PublicImageUrl::from($row->avatar_url),
+                            'role' => $row->role,
+                        ])
+                        ->values()
+                        ->all(),
+                    'pagination' => [
+                        'current_page' => $safePage,
+                        'per_page' => $perPage,
+                        'total' => $membersCount,
+                        'last_page' => $lastPage,
+                    ],
                 ],
             ],
-        ];
+        );
     }
 
     /**
@@ -929,11 +956,18 @@ class TeamService
     {
         $id = (int) $row->id;
 
+        $sport = [
+            'id' => (int) $row->sport_id,
+            'name' => $row->sport_name ?? '',
+            'slug' => $row->sport_slug ?? '',
+        ];
+
         return [
             'id' => $id,
             'name' => $row->name,
             'slug' => $row->slug,
             'sport_id' => (int) $row->sport_id,
+            'sport' => $sport,
             'description' => $row->description,
             'hq_city' => $row->hq_city,
             'hq_latitude' => $row->hq_latitude !== null ? (float) $row->hq_latitude : null,

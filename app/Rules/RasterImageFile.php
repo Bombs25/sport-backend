@@ -32,7 +32,7 @@ class RasterImageFile implements ValidationRule
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (! $value instanceof UploadedFile) {
-            $fail('The file must be a JPEG, PNG, GIF, or WebP image.');
+            $fail(__('Le fichier doit être une image JPEG, PNG, GIF ou WebP.'));
 
             return;
         }
@@ -47,7 +47,7 @@ class RasterImageFile implements ValidationRule
         $content = self::readUploadContents($value, $path);
 
         if ($content === null || $content === '') {
-            $fail('The file must be a JPEG, PNG, GIF, or WebP image.');
+            $fail(__('Le fichier doit être une image JPEG, PNG, GIF ou WebP.'));
 
             return;
         }
@@ -79,7 +79,7 @@ class RasterImageFile implements ValidationRule
             return;
         }
 
-        $fail('The file must be a JPEG, PNG, GIF, or WebP image.');
+        $fail(__('Le fichier doit être une image JPEG, PNG, GIF ou WebP.'));
     }
 
     private static function readUploadContents(UploadedFile $file, string $path): ?string

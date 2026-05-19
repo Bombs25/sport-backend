@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Support\UserProfileLocation;
 use Database\Seeders\SportsSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class TeamManagementTest extends TestCase
@@ -27,21 +29,56 @@ class TeamManagementTest extends TestCase
         return (int) $id;
     }
 
+    private function grantActiveSubscription(User $user): void
+    {
+        $type = (string) config('billing.subscription_type');
+
+        DB::table('subscriptions')->updateOrInsert(
+            ['user_id' => $user->id, 'type' => $type],
+            [
+                'stripe_id' => 'sub_test_'.Str::random(12),
+                'stripe_status' => 'active',
+                'stripe_price' => 'price_test',
+                'quantity' => 1,
+                'trial_ends_at' => null,
+                'ends_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function postTeamCreate(array $payload, string $token): \Illuminate\Testing\TestResponse
+    {
+        return $this->post('/api/v1/auth/teams', array_merge([
+            'hq_city' => 'Paris',
+            'hq_latitude' => 48.8566,
+            'hq_longitude' => 2.3522,
+            'cover_image_url' => UploadedFile::fake()->image('cover.jpg'),
+            'logo_url' => UploadedFile::fake()->image('logo.png'),
+        ], $payload), [
+            'Authorization' => 'Bearer '.$token,
+            'Accept' => 'application/json',
+        ]);
+    }
+
     public function test_authenticated_user_can_create_team_and_list_it_under_created(): void
     {
         $user = User::factory()->create();
+        $this->grantActiveSubscription($user);
         $token = $user->createToken('auth')->plainTextToken;
         $sportId = $this->sportIdBySlug('football');
 
-        $create = $this->postJson('/api/v1/auth/teams', [
+        $create = $this->postTeamCreate([
             'name' => 'Les Lions Test',
             'sport_id' => $sportId,
             'description' => 'Créneaux mardi.',
             'competition_type' => 'leisure',
             'skill_level' => 'intermediate',
-        ], [
-            'Authorization' => 'Bearer '.$token,
-        ])->assertCreated()
+        ], $token)->assertCreated()
             ->assertJsonPath('team.name', 'Les Lions Test')
             ->assertJsonPath('team.sport.slug', 'football')
             ->assertJsonPath('team.members_count', 1);
@@ -54,7 +91,8 @@ class TeamManagementTest extends TestCase
             ->assertJsonPath('data.counts.created', 1)
             ->assertJsonPath('data.counts.joined', 0)
             ->assertJsonPath('data.created.0.id', $teamId)
-            ->assertJsonPath('data.created.0.members_count', 1);
+            ->assertJsonPath('data.created.0.members_count', 1)
+            ->assertJsonPath('data.created.0.sport.slug', 'football');
 
         $this->assertDatabaseHas('team_members', [
             'team_id' => $teamId,
@@ -144,15 +182,14 @@ class TeamManagementTest extends TestCase
     public function test_creator_can_update_and_delete_team(): void
     {
         $user = User::factory()->create();
+        $this->grantActiveSubscription($user);
         $token = $user->createToken('auth')->plainTextToken;
         $sportId = $this->sportIdBySlug('basketball');
 
-        $teamId = $this->postJson('/api/v1/auth/teams', [
+        $teamId = $this->postTeamCreate([
             'name' => 'Basket City',
             'sport_id' => $sportId,
-        ], [
-            'Authorization' => 'Bearer '.$token,
-        ])->assertCreated()
+        ], $token)->assertCreated()
             ->json('team.id');
 
         $this->patchJson('/api/v1/auth/teams/'.$teamId, [

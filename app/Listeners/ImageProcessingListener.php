@@ -40,7 +40,7 @@ class ImageProcessingListener
     {
         $files = ImageProcessingStoreRequest::validatedFileList($event->files);
 
-        /** @var FilesystemAdapter $disk staging : jamais sous {@code storage/app/public/} */
+        /** @var FilesystemAdapter $disk staging privé ({@see ImageProcessingInterface::STAGING_DISK}) */
         $disk = Storage::disk(ImageProcessingInterface::STAGING_DISK);
         $batchKey = $event->uniqueKey;
         $variant = $event->variant;
@@ -119,6 +119,7 @@ class ImageProcessingListener
         $processing = $this->imageProcessing;
         $eventType = $event->type;
         $contextId = $event->contextId;
+        $mediaFields = $event->mediaFields;
 
         Bus::batch([
             new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
@@ -127,8 +128,14 @@ class ImageProcessingListener
                 new ConvertImageJob($user, $batchKey, $processing, $event->variant),
             ],
         ])
-            ->before(function (Batch $batch) {
-                // The batch has been created but no jobs have been added...
+            ->before(function (Batch $batch) use ($batchKey, $userId, $mediaFields) {
+                if ($mediaFields !== []) {
+                    Cache::put(
+                        ImagePipelineResultCache::mediaFieldsKey($batchKey, $userId, $batch->id),
+                        $mediaFields,
+                        ImagePipelineResultCache::ttl(),
+                    );
+                }
             })->progress(function (Batch $batch) use ($batchKey, $userId, $user) {
                 $payload = self::batchProgressPayload($batch);
 
@@ -180,6 +187,7 @@ class ImageProcessingListener
 
                 $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId, $batch->id);
                 $convertKey = ImagePipelineResultCache::convertKey($batchKey, $userId, $variant, $batch->id);
+                $mediaFieldsKey = ImagePipelineResultCache::mediaFieldsKey($batchKey, $userId, $batch->id);
 
                 $blurhash = Cache::get($blurKey);
                 $convertJson = Cache::get($convertKey);
@@ -195,8 +203,18 @@ class ImageProcessingListener
                     ? $convertPaths
                     : (is_string($convertJson) ? $convertJson : null);
 
+                $resolvedMediaFields = Cache::get($mediaFieldsKey);
+                if (! is_array($resolvedMediaFields)) {
+                    $resolvedMediaFields = [];
+                }
+
                 if ($eventType === 'team') {
-                    $this->addFilesRepository->addTeamFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
+                    $this->addFilesRepository->addTeamFilesUrlToDb(
+                        $blurhashes,
+                        $convertPathsPayload,
+                        $contextId,
+                        $resolvedMediaFields,
+                    );
                 } elseif ($eventType === 'profile') {
                     $this->addFilesRepository->addProfileFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
                 } elseif ($eventType === 'post') {
@@ -219,6 +237,7 @@ class ImageProcessingListener
                 Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id));
                 Cache::forget($blurKey);
                 Cache::forget($convertKey);
+                Cache::forget($mediaFieldsKey);
             })
             ->name("image-processing:{$batchKey}")
             ->onQueue(ImageProcessingQueue::NAME)

@@ -7,6 +7,7 @@ use App\Services\Search\TypesenseUserService;
 use Database\Seeders\Support\DemoPassword;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Typesense\Exceptions\TypesenseClientError;
 
 /**
@@ -42,8 +43,9 @@ class DatabaseSeeder extends Seeder
             DemoNotificationsSeeder::class,
         ]);
 
-        $this->syncTypesenseUsers();
+        // Équipes d’abord (rapide) : si la sync users (~15k docs) est longue ou interrompue, la recherche équipes reste utilisable.
         $this->syncTypesenseTeams();
+        $this->syncTypesenseUsers();
 
         if ($this->command !== null) {
             $this->command->newLine();
@@ -58,7 +60,7 @@ class DatabaseSeeder extends Seeder
             $service->recreateCollection();
             $synced = $service->syncAllUsersFromDatabase();
         } catch (TypesenseClientError $e) {
-            $this->command?->warn('Typesense indisponible, synchronisation finale ignorée : '.$e->getMessage());
+            $this->command?->error('Typesense users : échec de synchronisation — '.$e->getMessage());
 
             return;
         }
@@ -73,7 +75,13 @@ class DatabaseSeeder extends Seeder
             $service->recreateCollection();
             $synced = $service->syncAllTeamsFromDatabase();
         } catch (TypesenseClientError $e) {
-            $this->command?->warn('Typesense indisponible, synchronisation finale teams ignorée : '.$e->getMessage());
+            $this->command?->error('Typesense teams : échec de synchronisation — '.$e->getMessage());
+
+            return;
+        }
+
+        if ($synced === 0 && DB::table('teams')->exists()) {
+            $this->command?->warn('Typesense teams : 0 document importé alors que MySQL contient des équipes — vérifier Typesense et les logs.');
 
             return;
         }

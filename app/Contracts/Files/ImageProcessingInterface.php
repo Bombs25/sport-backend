@@ -6,7 +6,7 @@ use App\Enums\ImageVariantLongEdge;
 
 interface ImageProcessingInterface
 {
-    /** Disque Laravel pour originaux / variantes (hors {@code storage/app/public/}). */
+    /** Disque privé pour originaux / variantes (jamais le disque par défaut des livrables). */
     public const STAGING_DISK = 'local';
 
     public function generateblurhash(array $paths): string;
@@ -19,7 +19,7 @@ interface ImageProcessingInterface
 
     /**
      * @param  list<string>  $paths  sortie de {@see compress()}
-     * @return string JSON listant les chemins sur le disque `public` (préfixe dérivé du chemin staging → {@code temps/…}.webp)
+     * @return string JSON listant les chemins sur le disque par défaut (préfixe dérivé du chemin staging → {@code temps/…}.webp)
      */
     public function convert(array $paths): string;
 }

@@ -20,11 +20,11 @@ use Throwable;
  * Traitement d’images uploadées (flux universel backend) :
  * - correction EXIF
  * - une sortie par fichier selon {@see ImageVariantLongEdge}
- * - WebP intermédiaire sur le disque staging ; livrables finaux plats sous {@code public/temps/}
+ * - WebP intermédiaire sur le disque staging ; livrables finaux sous {@code temps/}
  *   ({@code {uniqueKey}__{stem}.webp}, où {@code uniqueKey} est le préfixe métier fourni à l’événement)
  *
  * Originaux et variantes : disque {@see ImageProcessingInterface::STAGING_DISK} uniquement ;
- * le disque {@code public} ne reçoit que {@code temps/} pour ce pipeline.
+ * les livrables utilisent le disque par défaut ({@see config('filesystems.default')}).
  */
 class ImageProcessing implements ImageProcessingInterface
 {
@@ -125,13 +125,12 @@ class ImageProcessing implements ImageProcessingInterface
 
     /**
      * @param  list<string>  $paths  sortie de {@see compress()} (WebP intermédiaires sur le disque staging)
-     * @return string JSON list<string> chemins relatifs au disque `public` (`temps/{uniqueKey}__{stem}.webp`)
+     * @return string JSON list<string> chemins relatifs au disque par défaut (`temps/{uniqueKey}__{stem}.webp`)
      */
     public function convert(array $paths): string
     {
         $finalPaths = [];
         $staging = Storage::disk(ImageProcessingInterface::STAGING_DISK);
-        $public = Storage::disk('public');
 
         foreach ($paths as $path) {
             $absolute = $staging->path($path);
@@ -160,7 +159,7 @@ class ImageProcessing implements ImageProcessingInterface
                 $relative = "temps/{$stem}.webp";
             }
 
-            $public->put($relative, $encoded->toString());
+            Storage::put($relative, $encoded->toString());
             $finalPaths[] = $relative;
         }
 

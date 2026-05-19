@@ -163,6 +163,24 @@ class TypesenseTeamService
     }
 
     /**
+     * Retire une équipe de l'index Typesense (idempotent si le document est absent).
+     *
+     * @throws TypesenseClientError
+     */
+    public function deleteTeamFromIndex(int $teamId): void
+    {
+        if (! TypesenseSyncGuard::isEnabled()) {
+            return;
+        }
+
+        try {
+            $this->client->collections['teams']->documents[(string) $teamId]->delete();
+        } catch (ObjectNotFound) {
+            //
+        }
+    }
+
+    /**
      * @throws TypesenseClientError
      */
     public function syncAllTeamsFromDatabase(int $chunkSize = 1000): int
@@ -233,6 +251,8 @@ class TypesenseTeamService
         float $radiusKm = 100.0,
         int $page = 1,
         int $perPage = 10,
+        ?int $excludeCreatorId = null,
+        array $excludeTeamIds = [],
     ): array {
         $q = $this->normalizeQuery($query);
         $lat = $this->formatGeoNumber($latitude);
@@ -253,6 +273,8 @@ class TypesenseTeamService
         if ($skillLevel !== null && $skillLevel !== '') {
             $filters[] = 'skill_level:='.$skillLevel;
         }
+
+        $filters = array_merge($filters, self::buildSearchExclusionFilters($excludeCreatorId, $excludeTeamIds));
 
         $response = $this->client->collections['teams']->documents->search([
             'q' => $q,
@@ -395,6 +417,32 @@ class TypesenseTeamService
         }
 
         return $results;
+    }
+
+    /**
+     * Filtres Typesense pour exclure les équipes du viewer (créées ou dont il est membre).
+     *
+     * @param  list<int>  $excludeTeamIds
+     * @return list<string>
+     */
+    public static function buildSearchExclusionFilters(?int $excludeCreatorId, array $excludeTeamIds): array
+    {
+        $filters = [];
+
+        if ($excludeCreatorId !== null) {
+            $filters[] = 'creator_id:!='.$excludeCreatorId;
+        }
+
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $id): int => (int) $id, $excludeTeamIds),
+            static fn (int $id): bool => $id > 0,
+        )));
+
+        if ($ids !== []) {
+            $filters[] = 'id:!=['.implode(', ', $ids).']';
+        }
+
+        return $filters;
     }
 
     private function formatGeoNumber(float $value): string

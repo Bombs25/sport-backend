@@ -60,4 +60,32 @@ class TeamUpdateRequest extends FormRequest
 
         return Team::query()->find((int) $teamId);
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'name' => __('nom de l\'équipe'),
+            'sport_id' => __('sport'),
+            'description' => __('description'),
+            'hq_city' => __('ville du QG'),
+            'cover_image_url' => __('photo de couverture'),
+            'logo_url' => __('logo'),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.unique' => __('Ce nom d\'équipe est déjà utilisé.'),
+            'sport_id.exists' => __('Le sport sélectionné n\'est pas valide.'),
+            'competition_type.in' => __('Le type d\'équipe sélectionné n\'est pas valide.'),
+            'skill_level.in' => __('Le niveau sélectionné n\'est pas valide.'),
+        ];
+    }
 }

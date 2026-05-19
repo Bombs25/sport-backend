@@ -28,17 +28,30 @@ class TeamUpdateController extends Controller
         }
         $service->updateTeam($team, $data);
 
-        ImageProcessingEvent::dispatch(
-            $request->user(),
-            [
-                $request->file('cover_image_url'),
-                $request->file('logo_url'),
-            ],
-            'team-' . $team->id,
-            contextId: $team->id,
-            variant: ImageVariantLongEdge::GridThumb,
-            type: 'team',
-        );
+        $files = [];
+        $mediaFields = [];
+
+        if ($request->hasFile('cover_image_url')) {
+            $files[] = $request->file('cover_image_url');
+            $mediaFields[] = 'cover_image_url';
+        }
+
+        if ($request->hasFile('logo_url')) {
+            $files[] = $request->file('logo_url');
+            $mediaFields[] = 'logo_url';
+        }
+
+        if ($files !== []) {
+            ImageProcessingEvent::dispatch(
+                $request->user(),
+                $files,
+                'team-'.$team->id,
+                contextId: $team->id,
+                variant: ImageVariantLongEdge::GridThumb,
+                type: 'team',
+                mediaFields: $mediaFields,
+            );
+        }
 
         return response()->json([
             'message' => __('Équipe mise à jour.'),

@@ -24,10 +24,17 @@ class AddFilesRepository
      * (voir {@see TeamStoreController}).
      *
      * @param  list<string>  $blurhashes
-     * @param  array<string, mixed>|list<mixed>|string|null  $convertPaths  JSON ou liste de chemins disque {@code public}
+     * @param  array<string, mixed>|list<mixed>|string|null  $convertPaths  JSON ou liste de chemins sur le disque par défaut
      */
-    public function addTeamFilesUrlToDb(array $blurhashes, array|string|null $convertPaths, ?int $teamId): void
-    {
+    /**
+     * @param  list<string>  $mediaFields  champs alignés sur {@see $convertPaths} (ex. mise à jour logo seul)
+     */
+    public function addTeamFilesUrlToDb(
+        array $blurhashes,
+        array|string|null $convertPaths,
+        ?int $teamId,
+        array $mediaFields = [],
+    ): void {
         $paths = $convertPaths;
         if (is_string($paths)) {
             $decoded = json_decode($paths, true);
@@ -37,16 +44,30 @@ class AddFilesRepository
             $paths = [];
         }
 
-        $coverPath = isset($paths[0]) && is_string($paths[0]) ? $paths[0] : null;
-        $logoPath = isset($paths[1]) && is_string($paths[1]) ? $paths[1] : null;
+        $updates = ['updated_at' => now()];
 
-        DB::table('teams')->where('id', (int) $teamId)->update([
-            'cover_image_url' => $coverPath,
-            'logo_url' => $logoPath,
-            'cover_image_blurhash' => $blurhashes[0] ?? null,
-            'logo_blurhash' => $blurhashes[1] ?? null,
-            'updated_at' => now(),
-        ]);
+        if ($mediaFields !== []) {
+            foreach ($mediaFields as $index => $field) {
+                if (! is_string($field) || ! isset($paths[$index]) || ! is_string($paths[$index])) {
+                    continue;
+                }
+
+                if ($field === 'cover_image_url') {
+                    $updates['cover_image_url'] = $paths[$index];
+                    $updates['cover_image_blurhash'] = $blurhashes[$index] ?? null;
+                } elseif ($field === 'logo_url') {
+                    $updates['logo_url'] = $paths[$index];
+                    $updates['logo_blurhash'] = $blurhashes[$index] ?? null;
+                }
+            }
+        } else {
+            $updates['cover_image_url'] = isset($paths[0]) && is_string($paths[0]) ? $paths[0] : null;
+            $updates['logo_url'] = isset($paths[1]) && is_string($paths[1]) ? $paths[1] : null;
+            $updates['cover_image_blurhash'] = $blurhashes[0] ?? null;
+            $updates['logo_blurhash'] = $blurhashes[1] ?? null;
+        }
+
+        DB::table('teams')->where('id', (int) $teamId)->update($updates);
 
         try {
             $this->typesenseTeams->syncTeamFromDatabase((int) $teamId);

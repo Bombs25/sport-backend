@@ -13,7 +13,9 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    // Livrables (logos, covers, avatars) : Storage::put / Storage::url / PublicImageUrl.
+    // Fichiers temporaires du pipeline image : disque « local » (ImageProcessingInterface::STAGING_DISK).
+    'default' => env('FILESYSTEM_DISK', 'public'),
 
     /*
     |--------------------------------------------------------------------------
