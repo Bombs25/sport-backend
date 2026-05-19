@@ -25,6 +25,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'password',
+        /** Jeton Expo push (`ExponentPushToken[...]`) — rempli par l'app, utilisé par {@see \App\Services\Notifications\ExpoPushService}. */
         'fcm_token',
     ];
 

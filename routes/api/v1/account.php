@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Account\UpdatePushTokenController;
 use App\Http\Controllers\Api\V1\Follow\FollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\FollowDestroyController;
 use App\Http\Controllers\Api\V1\Follow\FollowListController;
@@ -7,6 +8,8 @@ use App\Http\Controllers\Api\V1\Follow\FollowRequestAcceptController;
 use App\Http\Controllers\Api\V1\Follow\FollowRequestListController;
 use App\Http\Controllers\Api\V1\Follow\FollowRequestRejectController;
 use App\Http\Controllers\Api\V1\Follow\FollowStoreController;
+use App\Http\Controllers\Api\V1\Follow\UserFollowCountsController;
+use App\Http\Controllers\Api\V1\Follow\UserFollowListController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
 use App\Http\Controllers\Api\V1\Profile\UserPublicProfileController;
@@ -24,6 +27,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // Récupère le profil de l'utilisateur connecté (même format que login / register).
     Route::get('user', CurrentUserController::class);
+    Route::patch('push-token', UpdatePushTokenController::class);
     Route::get('upload-progress', UploadProgressPollController::class)->middleware('throttle:auth-follow-read');
     // Met à jour le profil utilisateur (nom, bio, confidentialité, localisation, etc.).
     Route::patch('profile', UpdateProfileController::class);
@@ -45,4 +49,8 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('users/search', UserNearbySearchController::class)->middleware('throttle:auth-follow-read');
     // Profil public d'un utilisateur (id) : e-mail masqué sauf soi-même ; comptes privés si non autorisé.
     Route::get('users/{user}/profile', UserPublicProfileController::class)->middleware('throttle:auth-follow-read');
+    // Totaux posts / followers / following d'un utilisateur (mêmes règles d'accès que le profil public).
+    Route::get('users/{user}/follows/counts', UserFollowCountsController::class)->middleware('throttle:auth-follow-read');
+    // Liste followers ou following d'un utilisateur (e-mail masqué ; mêmes règles d'accès que le profil public).
+    Route::get('users/{user}/follows', UserFollowListController::class)->middleware('throttle:auth-follow-read');
 });

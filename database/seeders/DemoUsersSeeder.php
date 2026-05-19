@@ -5,10 +5,10 @@ namespace Database\Seeders;
 use App\Services\Search\TypesenseUserService;
 use App\Support\UserProfileLocation;
 use Carbon\CarbonInterface;
+use Database\Seeders\Support\DemoPassword;
 use Faker\Factory as FakerFactory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Typesense\Exceptions\TypesenseClientError;
 
@@ -58,7 +58,7 @@ class DemoUsersSeeder extends Seeder
     {
         $totalUsers = max(1, min(10_000_000, (int) env('DEMO_USERS_COUNT', 15_000)));
         $now = now();
-        $passwordHash = Hash::make('jimmyBulL1230$');
+        $passwordHash = DemoPassword::hash();
         $namePool = $this->buildNamePool();
 
         $sportIds = DB::table('sports')->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();

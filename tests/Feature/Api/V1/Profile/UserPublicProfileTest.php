@@ -100,4 +100,39 @@ class UserPublicProfileTest extends TestCase
             ->assertJsonPath('user.am_i_following', true)
             ->assertJsonMissingPath('user.email');
     }
+
+    public function test_public_profile_exposes_target_follows_me_when_reciprocal_pending(): void
+    {
+        $viewer = User::factory()->create();
+        $target = User::factory()->create();
+        $token = $viewer->createToken('auth')->plainTextToken;
+
+        DB::table('user_profiles')->insert(array_merge([
+            'user_id' => $target->id,
+            'display_name' => 'Cible',
+            'handle' => 'cible_follows_me',
+            'bio' => null,
+            'avatar_url' => null,
+            'is_private' => false,
+            'city' => null,
+            'address_line' => null,
+            'birth_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
+
+        DB::table('follows')->insert([
+            'follower_id' => $target->id,
+            'following_id' => $viewer->id,
+            'status' => 'accepted',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/v1/auth/users/'.$target->id.'/profile', [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk()
+            ->assertJsonPath('user.am_i_following', false)
+            ->assertJsonPath('user.target_follows_me', true);
+    }
 }

@@ -5,10 +5,10 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Services\Team\MatchResultService;
 use App\Support\UserProfileLocation;
+use Database\Seeders\Support\DemoPassword;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
@@ -152,7 +152,7 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
         $this->createSanctumTokenForEmail(self::DEMO_LOGIN_EMAIL);
 
         if ($this->command !== null) {
-            $this->command->info('Connexion API démo : '.self::DEMO_LOGIN_EMAIL.' / password');
+            $this->command->info('Connexion API démo : '.self::DEMO_LOGIN_EMAIL.' / '.DemoPassword::PLAIN);
             $this->command->info('Résultat validé (publication_id pour posts/*) : '.$matchResultValidatedId);
         }
     }
@@ -229,7 +229,7 @@ class DemoMatchSocialInteractionsSeeder extends Seeder
     {
         DB::table('users')->where('id', $homeCaptainId)->update([
             'email' => self::DEMO_LOGIN_EMAIL,
-            'password' => Hash::make('password'),
+            'password' => DemoPassword::hash(),
             'name' => 'Capitaine fil démo',
             'updated_at' => $now,
         ]);

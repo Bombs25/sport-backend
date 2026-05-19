@@ -3,6 +3,8 @@
 namespace App\Services\Search;
 
 use App\Support\PublicImageUrl;
+use App\Support\Search\TypesenseSyncGuard;
+use App\Support\Search\TypesenseUsersCollectionSchema;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -20,26 +22,6 @@ use Typesense\Exceptions\TypesenseClientError;
 class TypesenseUserService
 {
     private Client $client;
-
-    /** @var array{name: string, fields: list<array<string, mixed>>, default_sorting_field: string} */
-    private const SCHEMA = [
-        'name' => 'users',
-        'fields' => [
-            ['name' => 'id', 'type' => 'int64'],
-            ['name' => 'name', 'type' => 'string'],
-            ['name' => 'email', 'type' => 'string', 'index' => false],
-            ['name' => 'display_name', 'type' => 'string'],
-            ['name' => 'handle', 'type' => 'string'],
-            ['name' => 'bio', 'type' => 'string', 'optional' => true],
-            ['name' => 'avatar_url', 'type' => 'string', 'optional' => true, 'index' => false],
-            ['name' => 'avatar_blurhash', 'type' => 'string', 'optional' => true, 'index' => false],
-            ['name' => 'is_private', 'type' => 'bool', 'facet' => true],
-            ['name' => 'city', 'type' => 'string', 'facet' => true, 'optional' => true],
-            ['name' => 'location', 'type' => 'geopoint', 'optional' => true],
-            ['name' => 'created_at', 'type' => 'int64'],
-        ],
-        'default_sorting_field' => 'created_at',
-    ];
 
     public function __construct()
     {
@@ -65,10 +47,14 @@ class TypesenseUserService
      */
     public function ensureCollection(): void
     {
+        if (! TypesenseSyncGuard::isEnabled()) {
+            return;
+        }
+
         try {
             $this->client->collections['users']->retrieve();
         } catch (ObjectNotFound) {
-            $this->client->collections->create(self::SCHEMA);
+            $this->client->collections->create(TypesenseUsersCollectionSchema::definition());
         }
     }
 
@@ -79,13 +65,17 @@ class TypesenseUserService
      */
     public function recreateCollection(): void
     {
+        if (! TypesenseSyncGuard::isEnabled()) {
+            return;
+        }
+
         try {
             $this->client->collections['users']->delete();
         } catch (ObjectNotFound) {
             //
         }
 
-        $this->client->collections->create(self::SCHEMA);
+        $this->client->collections->create(TypesenseUsersCollectionSchema::definition());
     }
 
     /**
@@ -110,7 +100,7 @@ class TypesenseUserService
      */
     public function importDocuments(array $documents): void
     {
-        if ($documents === []) {
+        if ($documents === [] || ! TypesenseSyncGuard::isEnabled()) {
             return;
         }
 
@@ -192,7 +182,7 @@ class TypesenseUserService
         $radius = $this->formatGeoNumber($radiusKm);
         $filters = [
             'is_private:=false',
-            "location:({$lat}, {$lng}, {$radius} km)",
+            // "location:({$lat}, {$lng}, {$radius} km)",
         ];
 
         if ($excludeUserId !== null) {

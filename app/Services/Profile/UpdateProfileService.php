@@ -2,7 +2,10 @@
 
 namespace App\Services\Profile;
 
+use App\Services\Search\Concerns\SyncsUserToTypesense;
+use App\Support\Search\TypesenseSyncGuard;
 use App\Services\Search\TypesenseTeamService;
+use App\Services\Search\TypesenseUserService;
 use App\Support\UserProfileLocation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,8 +19,11 @@ use Typesense\Exceptions\TypesenseClientError;
  */
 class UpdateProfileService
 {
+    use SyncsUserToTypesense;
+
     public function __construct(
         private readonly TypesenseTeamService $typesenseTeams,
+        private readonly TypesenseUserService $typesenseUsers,
     ) {}
 
     /**
@@ -94,6 +100,8 @@ class UpdateProfileService
 
         DB::table('user_profiles')->where('user_id', $userId)->update($profileUpdates);
 
+        $this->syncUserToTypesense($this->typesenseUsers, $userId);
+
         if ($locationChanged) {
             $this->syncCreatorTeamsToTypesense($userId);
         }
@@ -101,6 +109,10 @@ class UpdateProfileService
 
     private function syncCreatorTeamsToTypesense(int $userId): void
     {
+        if (! TypesenseSyncGuard::isEnabled()) {
+            return;
+        }
+
         try {
             $this->typesenseTeams->syncTeamsForCreatorFromDatabase($userId);
         } catch (TypesenseClientError $e) {

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Services\Search\TypesenseTeamService;
 use App\Services\Search\TypesenseUserService;
+use Database\Seeders\Support\DemoPassword;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Typesense\Exceptions\TypesenseClientError;
@@ -16,7 +17,7 @@ use Typesense\Exceptions\TypesenseClientError;
  *
  * Notifications base de données démo (≥ 1000 pour feed.demo) : {@see DemoNotificationsSeeder}. Tables framework (`jobs`, `cache`, …) hors scope.
  *
- * Comptes démo (mot de passe habituel de la factory : « password ») :
+ * Comptes démo (mot de passe : {@see DemoPassword::PLAIN}) :
  * - {@see DemoMatchCalendarSeeder} : calendar.demo@osport.local — token `demo-calendar-seed`
  * - {@see DemoMatchSocialInteractionsSeeder} : feed.demo@osport.local — token `demo-feed-seed`
  */
@@ -46,7 +47,7 @@ class DatabaseSeeder extends Seeder
 
         if ($this->command !== null) {
             $this->command->newLine();
-            $this->command->info('Résumé démo : calendar.demo@osport.local et feed.demo@osport.local (password = password).');
+            $this->command->info('Résumé démo : calendar.demo@osport.local et feed.demo@osport.local (mot de passe = '.DemoPassword::PLAIN.').');
         }
     }
 

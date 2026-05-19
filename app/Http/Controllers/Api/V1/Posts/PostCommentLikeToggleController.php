@@ -30,7 +30,7 @@ class PostCommentLikeToggleController extends Controller
                 (string) $validated['post_type'],
                 (string) $validated['action'],
             ),
-        ])->onConnection('post_notifications')->dispatch();
+        ])->onQueue('post_notifications')->dispatch();
 
         return response()->json([
             'message' => __('Traitement du like/dislike en cours.'),

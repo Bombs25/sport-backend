@@ -19,6 +19,11 @@ abstract class TestCase extends BaseTestCase
         config(['mail.default' => 'array']);
 
         /*
+         * Typesense : `TypesenseSyncGuard` + `TYPESENSE_SYNC_ENABLED=false` dans phpunit.xml — aucune
+         * suppression/recréation de collection ni import pendant les tests (index local préservé).
+         */
+
+        /*
          * `php artisan config:cache` fige `post_notifications` sur redis : sans ce correctif, les chaînes
          * `Bus::chain(...)->onConnection('post_notifications')` ne s’exécutent pas sous PHPUnit.
          */

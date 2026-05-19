@@ -29,3 +29,7 @@ use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 Route::post('broadcasting/auth', [BroadcastController::class, 'authenticate'])
     ->middleware('auth:sanctum')
     ->withoutMiddleware([EnsureFrontendRequestsAreStateful::class]);
+
+//     php artisan queue:work --queue=image-processing,post_notifications
+//     (connexion Redis par défaut ; ne pas utiliser --connection=post_notifications seul)
+// php artisan reverb:start

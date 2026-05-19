@@ -36,6 +36,7 @@ class LoginRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'string'],
             'accept_terms' => ['sometimes', 'accepted'],
+            'fcm_token' => ['sometimes', 'nullable', 'string', 'max:512', 'starts_with:ExponentPushToken['],
         ];
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Support\PublicImageUrl;
+use App\Support\Search\TypesenseSyncGuard;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -73,6 +74,10 @@ class TypesenseTeamService
      */
     public function ensureCollection(): void
     {
+        if (! TypesenseSyncGuard::isEnabled()) {
+            return;
+        }
+
         try {
             $this->client->collections['teams']->retrieve();
         } catch (ObjectNotFound) {
@@ -87,6 +92,10 @@ class TypesenseTeamService
      */
     public function recreateCollection(): void
     {
+        if (! TypesenseSyncGuard::isEnabled()) {
+            return;
+        }
+
         try {
             $this->client->collections['teams']->delete();
         } catch (ObjectNotFound) {
@@ -124,7 +133,7 @@ class TypesenseTeamService
      */
     public function importDocuments(array $documents): void
     {
-        if ($documents === []) {
+        if ($documents === [] || ! TypesenseSyncGuard::isEnabled()) {
             return;
         }
 

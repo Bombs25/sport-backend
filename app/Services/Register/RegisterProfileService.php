@@ -2,6 +2,8 @@
 
 namespace App\Services\Register;
 
+use App\Services\Search\Concerns\SyncsUserToTypesense;
+use App\Services\Search\TypesenseUserService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +17,12 @@ use Illuminate\Validation\ValidationException;
  */
 class RegisterProfileService
 {
+    use SyncsUserToTypesense;
+
+    public function __construct(
+        private readonly TypesenseUserService $typesenseUsers,
+    ) {}
+
     /**
      * Met à jour le nom d’état civil (`users.name`) et l’affichage public (`user_profiles.display_name`).
      */
@@ -44,5 +52,7 @@ class RegisterProfileService
             'birth_date' => $birthDate,
             'updated_at' => now(),
         ]);
+
+        $this->syncUserToTypesense($this->typesenseUsers, $userId);
     }
 }

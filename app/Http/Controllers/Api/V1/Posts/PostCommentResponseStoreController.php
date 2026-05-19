@@ -32,7 +32,7 @@ class PostCommentResponseStoreController extends Controller
                 (string) $validated['response'],
                 true,
             ),
-        ])->onConnection('post_notifications')->dispatch();
+        ])->onQueue('post_notifications')->dispatch();
 
         return response()->json([
             'message' => __('Réponse au commentaire en cours de traitement.'),

@@ -40,6 +40,12 @@ class LoginController extends Controller
             ]);
         }
 
+        if ($request->filled('fcm_token')) {
+            $user->forceFill([
+                'fcm_token' => $request->validated('fcm_token'),
+            ])->save();
+        }
+
         $token = $loginService->createSanctumToken($user);
 
         return response()->json([

@@ -29,7 +29,7 @@ class PostCommentStoreController extends Controller
                 (string) $validated['post_type'],
                 (string) $validated['commentaire'],
             ),
-        ])->onConnection('post_notifications')->dispatch();
+        ])->onQueue('post_notifications')->dispatch();
 
         return response()->json([
             'message' => 'Commentaire en cours de traitement.',

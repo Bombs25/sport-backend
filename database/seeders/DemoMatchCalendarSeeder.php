@@ -5,9 +5,9 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Services\Team\MatchResultService;
 use Carbon\CarbonInterface;
+use Database\Seeders\Support\DemoPassword;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * Rattache le jeu « équipes génériques » ({@see DemoTeamsSeeder}) au domaine match : événements planifiés,
@@ -110,7 +110,7 @@ class DemoMatchCalendarSeeder extends Seeder
 
         if ($this->command !== null) {
             $this->command->info('DemoMatchCalendarSeeder : calendrier + résultats (équipes demo-seed-team-01…05).');
-            $this->command->info('Compte API optionnel : '.self::DEMO_LOGIN_EMAIL.' / password (token demo-calendar-seed).');
+            $this->command->info('Compte API optionnel : '.self::DEMO_LOGIN_EMAIL.' / '.DemoPassword::PLAIN.' (token demo-calendar-seed).');
         }
     }
 
@@ -352,7 +352,7 @@ class DemoMatchCalendarSeeder extends Seeder
 
         DB::table('users')->where('id', $captainId)->update([
             'email' => self::DEMO_LOGIN_EMAIL,
-            'password' => Hash::make('password'),
+            'password' => DemoPassword::hash(),
             'name' => 'Capitaine calendrier démo',
             'updated_at' => $now,
         ]);

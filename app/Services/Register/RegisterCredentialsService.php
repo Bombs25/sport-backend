@@ -3,6 +3,8 @@
 namespace App\Services\Register;
 
 use App\Models\User;
+use App\Services\Search\Concerns\SyncsUserToTypesense;
+use App\Services\Search\TypesenseUserService;
 use App\Support\UserProfileLocation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,12 @@ use Laravel\Sanctum\NewAccessToken;
  */
 class RegisterCredentialsService
 {
+    use SyncsUserToTypesense;
+
+    public function __construct(
+        private readonly TypesenseUserService $typesenseUsers,
+    ) {}
+
     /**
      * @return array{user: User, token: NewAccessToken}
      */
@@ -69,6 +77,8 @@ class RegisterCredentialsService
              * Autres écouteurs (welcome, intégrations) peuvent s’y brancher sans modifier ce service.
              */
             event(new Registered($user));
+
+            $this->syncUserToTypesense($this->typesenseUsers, (int) $user->id);
 
             return [
                 'user' => $user,

@@ -29,7 +29,7 @@ class PostCommentDestroyController extends Controller
             $postId,
             $postType,
             $actorUserId,
-        )->onConnection('post_notifications');
+        )->onQueue('post_notifications');
 
         return response()->json([
             'message' => __('Suppression du commentaire en cours de traitement.'),

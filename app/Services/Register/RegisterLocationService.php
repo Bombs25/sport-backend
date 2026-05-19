@@ -2,6 +2,8 @@
 
 namespace App\Services\Register;
 
+use App\Services\Search\Concerns\SyncsUserToTypesense;
+use App\Services\Search\TypesenseUserService;
 use App\Support\UserProfileLocation;
 use Illuminate\Support\Facades\DB;
 
@@ -13,6 +15,12 @@ use Illuminate\Support\Facades\DB;
  */
 class RegisterLocationService
 {
+    use SyncsUserToTypesense;
+
+    public function __construct(
+        private readonly TypesenseUserService $typesenseUsers,
+    ) {}
+
     /**
      * Persiste la localisation issue du client (React Native : lat/lng GPS ou carte, texte d’adresse).
      *
@@ -34,5 +42,7 @@ class RegisterLocationService
                 'updated_at' => now(),
             ],
         ));
+
+        $this->syncUserToTypesense($this->typesenseUsers, $userId);
     }
 }

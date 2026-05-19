@@ -13,9 +13,9 @@ class FollowService
      * Crée ou met à jour une relation de suivi.
      * Compte privé cible → `pending` ; sinon `accepted`.
      *
-     * @return 'pending'|'accepted'
+     * @return array{status: 'pending'|'accepted', notify: bool, follow_id: int|null}
      */
-    public function follow(int $followerId, int $followingId): string
+    public function follow(int $followerId, int $followingId): array
     {
         $existing = DB::table('follows')
             ->where('follower_id', $followerId)
@@ -23,7 +23,11 @@ class FollowService
             ->first();
 
         if ($existing !== null && $existing->status === 'accepted') {
-            return 'accepted';
+            return [
+                'status' => 'accepted',
+                'notify' => false,
+                'follow_id' => (int) $existing->id,
+            ];
         }
 
         $isPrivate = (bool) DB::table('user_profiles')
@@ -31,6 +35,8 @@ class FollowService
             ->value('is_private');
 
         $status = $isPrivate ? 'pending' : 'accepted';
+        $previousStatus = $existing !== null ? (string) $existing->status : null;
+        $notify = $existing === null || $previousStatus !== $status;
 
         DB::table('follows')->upsert([
             [
@@ -46,7 +52,16 @@ class FollowService
             $this->addFollowingToCache($followerId, $followingId);
         }
 
-        return $status;
+        $followId = DB::table('follows')
+            ->where('follower_id', $followerId)
+            ->where('following_id', $followingId)
+            ->value('id');
+
+        return [
+            'status' => $status,
+            'notify' => $notify,
+            'follow_id' => $followId !== null ? (int) $followId : null,
+        ];
     }
 
     public function unfollow(int $followerId, int $followingId): void
@@ -123,7 +138,10 @@ class FollowService
         ];
     }
 
-    public function acceptIncomingRequest(int $followingUserId, int $followRowId): void
+    /**
+     * @return array{notify: bool, follower_id: int, follow_id: int}
+     */
+    public function acceptIncomingRequest(int $followingUserId, int $followRowId): array
     {
         $row = DB::table('follows')
             ->where('id', $followRowId)
@@ -144,7 +162,14 @@ class FollowService
                 'updated_at' => now(),
             ]);
 
-        $this->addFollowingToCache((int) $row->follower_id, $followingUserId);
+        $followerId = (int) $row->follower_id;
+        $this->addFollowingToCache($followerId, $followingUserId);
+
+        return [
+            'notify' => true,
+            'follower_id' => $followerId,
+            'follow_id' => $followRowId,
+        ];
     }
 
     public function rejectIncomingRequest(int $followingUserId, int $followRowId): void
@@ -160,6 +185,28 @@ class FollowService
                 'follow_request_id' => [__('Demande de suivi introuvable.')],
             ]);
         }
+    }
+
+    /**
+     * Stats affichées sur le profil public (posts publiés + follows acceptés).
+     *
+     * @return array{posts_count: int, followers_count: int, following_count: int}
+     */
+    public function profileStatsForUser(int $userId): array
+    {
+        $counts = $this->countsForUser($userId);
+
+        $postsCount = (int) DB::table('posts')
+            ->where('user_id', $userId)
+            ->where('status', 'published')
+            ->whereNull('deleted_at')
+            ->count();
+
+        return [
+            'posts_count' => $postsCount,
+            'followers_count' => $counts['followers_count'],
+            'following_count' => $counts['following_count'],
+        ];
     }
 
     /**

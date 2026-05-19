@@ -25,6 +25,23 @@ class RegisterUserPayloadBuilder
      *
      * @return array<string, mixed>
      */
+    public function assertViewerCanAccessProfile(User $viewer, int $targetUserId): void
+    {
+        if ($viewer->id === $targetUserId) {
+            return;
+        }
+
+        $row = $this->reader->userWithProfile($targetUserId);
+
+        if ($row === null) {
+            abort(404);
+        }
+
+        if ((bool) $row->is_private && ! $this->reader->hasAnyAcceptedFollowBetween($viewer->id, $targetUserId)) {
+            abort(403, __('Ce profil est privé.'));
+        }
+    }
+
     public function buildForViewer(User $viewer, int $targetUserId): array
     {
         if ($viewer->id === $targetUserId) {
@@ -34,24 +51,16 @@ class RegisterUserPayloadBuilder
             return $payload;
         }
 
+        $this->assertViewerCanAccessProfile($viewer, $targetUserId);
+
         $row = $this->reader->userWithProfile($targetUserId);
-
-        if ($row === null) {
-            abort(404);
-        }
-
-        $isPrivate = (bool) $row->is_private;
-
-        if ($isPrivate && ! $this->reader->hasAnyAcceptedFollowBetween($viewer->id, $targetUserId)) {
-            abort(403, __('Ce profil est privé.'));
-        }
-
         $target = User::query()->findOrFail($targetUserId);
 
         return [
             'id' => (int) $row->id,
             'name' => $row->name,
             'am_i_following' => $this->reader->viewerFollowsTargetAccepted($viewer->id, $targetUserId),
+            'target_follows_me' => $this->reader->viewerFollowsTargetAccepted($targetUserId, $viewer->id),
             'email_verified_at' => $target->email_verified_at?->toIso8601String(),
             'created_at' => $target->created_at?->toIso8601String(),
             'profile' => [

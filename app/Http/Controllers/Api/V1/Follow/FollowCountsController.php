@@ -16,12 +16,15 @@ class FollowCountsController extends Controller
 {
     public function __invoke(Request $request, FollowService $service): JsonResponse
     {
-        $counts = $service->countsForUser((int) $request->user()->id);
+        $userId = (int) $request->user()->id;
+        $stats = $service->profileStatsForUser($userId);
+        $counts = $service->countsForUser($userId);
 
         return response()->json([
             'data' => [
-                'followers_count' => $counts['followers_count'],
-                'following_count' => $counts['following_count'],
+                'posts_count' => $stats['posts_count'],
+                'followers_count' => $stats['followers_count'],
+                'following_count' => $stats['following_count'],
                 'pending_requests_count' => $counts['pending_requests_count'],
             ],
         ]);
