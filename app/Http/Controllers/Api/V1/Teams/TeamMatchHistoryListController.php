@@ -27,11 +27,13 @@ class TeamMatchHistoryListController extends Controller
                 'home' => [
                     'team_id' => $raw['home_team_id'],
                     'name' => $raw['home_team_name'],
+                    'logo_url' => $raw['home_team_logo_url'],
                     'score' => $raw['home_score'],
                 ],
                 'away' => [
                     'team_id' => $raw['away_team_id'],
                     'name' => $raw['away_team_name'],
+                    'logo_url' => $raw['away_team_logo_url'],
                     'score' => $raw['away_score'],
                 ],
             ],

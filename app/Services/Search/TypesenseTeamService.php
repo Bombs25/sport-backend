@@ -307,6 +307,45 @@ class TypesenseTeamService
         ];
     }
 
+    private const RANKING_SEARCH_MAX_HITS = 250;
+
+    /**
+     * IDs d'équipes correspondant à une recherche texte (classement), sans géolocalisation.
+     *
+     * @return array{ids: list<int>, found: int}
+     *
+     * @throws TypesenseClientError
+     */
+    public function searchTeamIdsForRanking(string $query, int $sportId): array
+    {
+        $q = $this->normalizeQuery($query);
+        if ($q === '*') {
+            return ['ids' => [], 'found' => 0];
+        }
+
+        $response = $this->client->collections['teams']->documents->search([
+            'q' => $q,
+            'query_by' => 'name,slug',
+            'filter_by' => 'sport_id:='.$sportId,
+            'page' => 1,
+            'per_page' => self::RANKING_SEARCH_MAX_HITS,
+        ]);
+
+        $ids = [];
+        foreach ($response['hits'] ?? [] as $hit) {
+            $document = $hit['document'] ?? [];
+            if (! isset($document['id'])) {
+                continue;
+            }
+            $ids[] = (int) $document['id'];
+        }
+
+        return [
+            'ids' => $ids,
+            'found' => (int) ($response['found'] ?? count($ids)),
+        ];
+    }
+
     /**
      * @return array{
      *     id: string,

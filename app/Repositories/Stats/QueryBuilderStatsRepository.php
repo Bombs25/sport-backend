@@ -116,12 +116,11 @@ class QueryBuilderStatsRepository implements StatsRepository
         SeasonWindow $seasonWindow,
         int $page = 1,
         int $perPage = 10,
-        ?string $q = null,
+        ?array $filterTeamIds = null,
     ): array {
         $safePage = max(1, $page);
         $safePerPage = max(1, $perPage);
         $offset = ($safePage - 1) * $safePerPage;
-        $searchTerm = $q !== null && $q !== '' ? trim($q) : null;
 
         $query = DB::query()
             ->fromSub(
@@ -145,8 +144,11 @@ class QueryBuilderStatsRepository implements StatsRepository
                 'ranked_stats'
             );
 
-        if ($searchTerm !== null) {
-            $query->where('team_name', 'like', '%'.$searchTerm.'%');
+        if ($filterTeamIds !== null) {
+            if ($filterTeamIds === []) {
+                return [];
+            }
+            $query->whereIn('team_id', $filterTeamIds);
         }
 
         $rows = $query

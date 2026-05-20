@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Teams;
 
 use App\Models\User;
+use App\Services\Search\TypesenseTeamService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\SportsSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -166,6 +167,13 @@ class TeamRankingApiTest extends TestCase
         $otherId = $this->createTeam(['name' => 'Other United', 'sport_id' => $sportId]);
         $this->insertStats($championId, $sportId, 80, 20, 2, 1, $ref);
         $this->insertStats($otherId, $sportId, 40, 10, 2, 2, $ref);
+
+        $this->mock(TypesenseTeamService::class, function ($mock) use ($championId, $sportId): void {
+            $mock->shouldReceive('searchTeamIdsForRanking')
+                ->once()
+                ->with('Champion', $sportId)
+                ->andReturn(['ids' => [$championId], 'found' => 1]);
+        });
 
         $response = $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/auth/teams/rankings?sport_id='.$sportId.'&year='.$year.'&q=Champion')

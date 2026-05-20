@@ -6,16 +6,17 @@ use App\Contracts\Stats\SeasonStrategy;
 use App\Contracts\Stats\StatsRepository;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Teams\TeamRankingListRequest;
+use App\Services\Search\TypesenseTeamService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Typesense\Exceptions\TypesenseClientError;
 
 /**
  * Ce qu'il fait : renvoie le classement des equipes pour un sport et une annee donnes.
  *
  * Pourquoi : alimenter l'ecran "Classement Equipes" sans dupliquer la logique saisonniere.
- * SeasonStrategy: calcule la fenetre de saison (flexible via le binding du container).
- * StatsRepository: charge le classement avec RANK() en Query Builder (cf. §1.7 schema).
+ * Recherche texte : Typesense (noms) puis stats saison MySQL (rang / V-N-D / PTS).
  */
 class TeamRankingListController extends Controller
 {
@@ -23,6 +24,7 @@ class TeamRankingListController extends Controller
         TeamRankingListRequest $request,
         SeasonStrategy $seasonStrategy,
         StatsRepository $statsRepository,
+        TypesenseTeamService $typesenseTeams,
     ): JsonResponse {
         $validated = $request->validated();
         $sportId = (int) $validated['sport_id'];
@@ -39,9 +41,38 @@ class TeamRankingListController extends Controller
         $referenceDate = CarbonImmutable::create($year, 1, 1, 0, 0, 0);
         $seasonWindow = $seasonStrategy->resolveWindowForDate($referenceDate);
 
-        $rankings = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page, $perPage, $q);
-        $hasMoreProbePage = ($page * $perPage) + 1;
-        $hasMore = $statsRepository->loadSportRanking($sportId, $seasonWindow, $hasMoreProbePage, 1, $q) !== [];
+        $filterTeamIds = null;
+
+        if ($q !== null) {
+            try {
+                $searchResult = $typesenseTeams->searchTeamIdsForRanking($q, $sportId);
+                $filterTeamIds = $searchResult['ids'];
+            } catch (TypesenseClientError $e) {
+                return response()->json([
+                    'message' => __('Recherche classement indisponible pour le moment.'),
+                    'error' => $e->getMessage(),
+                ], 502);
+            }
+
+            if ($filterTeamIds === []) {
+                return response()->json([
+                    'data' => [
+                        'sport_id' => $sportId,
+                        'year' => $year,
+                        'season_key' => $seasonWindow->key,
+                        'rankings' => [],
+                        'pagination' => [
+                            'current_page' => $page,
+                            'per_page' => $perPage,
+                            'has_more' => false,
+                        ],
+                    ],
+                ]);
+            }
+        }
+
+        $rankings = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page, $perPage, $filterTeamIds);
+        $hasMore = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page + 1, $perPage, $filterTeamIds) !== [];
 
         $userTeamIds = DB::table('team_members')
             ->where('user_id', (int) $request->user()->id)

@@ -29,12 +29,15 @@ interface StatsRepository
      * @return array<int, array{rank: int, team_id: int, team_name: string, logo_url: ?string,
      *     victory_count: int, draw_count: int, defeat_count: int, point_count: int}>
      */
+    /**
+     * @param  list<int>|null  $filterTeamIds  Sous-ensemble d'équipes (ex. IDs Typesense) ; null = classement complet.
+     */
     public function loadSportRanking(
         int $sportId,
         SeasonWindow $seasonWindow,
         int $page = 1,
         int $perPage = 10,
-        ?string $q = null,
+        ?array $filterTeamIds = null,
     ): array;
 
     /**
