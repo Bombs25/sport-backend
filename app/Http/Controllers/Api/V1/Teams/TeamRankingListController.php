@@ -31,13 +31,17 @@ class TeamRankingListController extends Controller
         $year = isset($validated['year'])
             ? (int) $validated['year']
             : (int) CarbonImmutable::now()->year;
+        $q = isset($validated['q']) ? trim((string) $validated['q']) : null;
+        if ($q === '') {
+            $q = null;
+        }
 
         $referenceDate = CarbonImmutable::create($year, 1, 1, 0, 0, 0);
         $seasonWindow = $seasonStrategy->resolveWindowForDate($referenceDate);
 
-        $rankings = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page, $perPage);
+        $rankings = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page, $perPage, $q);
         $hasMoreProbePage = ($page * $perPage) + 1;
-        $hasMore = $statsRepository->loadSportRanking($sportId, $seasonWindow, $hasMoreProbePage, 1) !== [];
+        $hasMore = $statsRepository->loadSportRanking($sportId, $seasonWindow, $hasMoreProbePage, 1, $q) !== [];
 
         $userTeamIds = DB::table('team_members')
             ->where('user_id', (int) $request->user()->id)

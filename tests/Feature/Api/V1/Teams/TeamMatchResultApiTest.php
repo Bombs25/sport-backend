@@ -166,6 +166,17 @@ class TeamMatchResultApiTest extends TestCase
             'evaluator_team_id' => $ctx['away_team_id'],
             'evaluated_team_id' => $ctx['home_team_id'],
         ]);
+
+        $this->assertDatabaseHas('stats', [
+            'team_id' => $ctx['home_team_id'],
+            'victory_count' => 1,
+            'defeat_count' => 0,
+        ]);
+        $this->assertDatabaseHas('stats', [
+            'team_id' => $ctx['away_team_id'],
+            'victory_count' => 0,
+            'defeat_count' => 1,
+        ]);
     }
 
     public function test_away_captain_can_refuse_and_home_can_resubmit(): void

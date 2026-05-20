@@ -116,12 +116,14 @@ class QueryBuilderStatsRepository implements StatsRepository
         SeasonWindow $seasonWindow,
         int $page = 1,
         int $perPage = 10,
+        ?string $q = null,
     ): array {
         $safePage = max(1, $page);
         $safePerPage = max(1, $perPage);
         $offset = ($safePage - 1) * $safePerPage;
+        $searchTerm = $q !== null && $q !== '' ? trim($q) : null;
 
-        $rows = DB::query()
+        $query = DB::query()
             ->fromSub(
                 DB::table('stats')
                     ->join('teams', 'teams.id', '=', 'stats.team_id')
@@ -141,7 +143,13 @@ class QueryBuilderStatsRepository implements StatsRepository
                         RANK() OVER (ORDER BY stats.point_count DESC) as rank_position
                     '),
                 'ranked_stats'
-            )
+            );
+
+        if ($searchTerm !== null) {
+            $query->where('team_name', 'like', '%'.$searchTerm.'%');
+        }
+
+        $rows = $query
             ->orderBy('rank_position')
             ->orderBy('team_name')
             ->offset($offset)

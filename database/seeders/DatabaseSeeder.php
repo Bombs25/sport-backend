@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
             DemoBulkMatchResultsSeeder::class,
             DemoRegularPostsSeeder::class,
             StatsFromMatchResultsSeeder::class,
+            PalmaresFromStatsSeeder::class,
             DemoNotificationsSeeder::class,
         ]);
 

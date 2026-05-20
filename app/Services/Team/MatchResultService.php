@@ -488,12 +488,16 @@ class MatchResultService
                     'updated_at' => $now,
                 ]);
 
-            ApplyValidatedMatchResultStatsJob::dispatch(
-                $homeTeamId,
-                $awayTeamId,
-                (int) $result->home_score,
-                (int) $result->away_score,
-            )->afterCommit();
+            $homeScore = (int) $result->home_score;
+            $awayScore = (int) $result->away_score;
+            DB::afterCommit(static function () use ($homeTeamId, $awayTeamId, $homeScore, $awayScore): void {
+                ApplyValidatedMatchResultStatsJob::dispatchSync(
+                    $homeTeamId,
+                    $awayTeamId,
+                    $homeScore,
+                    $awayScore,
+                );
+            });
         });
     }
 
@@ -718,11 +722,11 @@ class MatchResultService
                 'updated_at' => $now,
             ]);
 
-        ApplyValidatedMatchResultStatsJob::dispatch(
+        ApplyValidatedMatchResultStatsJob::dispatchSync(
             $homeTeamId,
             $awayTeamId,
             $homeScore,
             $awayScore,
-        )->afterCommit();
+        );
     }
 }
