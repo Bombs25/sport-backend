@@ -19,7 +19,16 @@ class TeamMatchRequestListRequest extends FormRequest
     {
         return [
             'type' => ['nullable', 'string', Rule::in(['received', 'sent'])],
-            'status' => ['nullable', 'string', Rule::in(['pending', 'accepted', 'refused', 'scores_to_confirm', 'finished'])],
+            'status' => ['nullable', 'string', Rule::in([
+                'pending',
+                'accepted',
+                'confirmed',
+                'refused',
+                'scores_to_confirm',
+                'score_refused',
+                'disputed',
+                'finished',
+            ])],
             'scheduled_at' => ['nullable', 'date'],
             'sport_name' => ['nullable', 'string', 'max:120'],
             'page' => ['nullable', 'integer', 'min:1'],

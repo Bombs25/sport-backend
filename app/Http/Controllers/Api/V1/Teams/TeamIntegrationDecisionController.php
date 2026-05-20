@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Teams;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\TeamIntegrationDecisionNotificationJob;
 use App\Models\Team;
 use App\Services\Team\TeamService;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,13 @@ class TeamIntegrationDecisionController extends Controller
             $validated['decision'],
             (int) $request->user()->id,
         );
+
+        TeamIntegrationDecisionNotificationJob::dispatch(
+            $team->id,
+            (int) $validated['asker_user_id'],
+            (int) $request->user()->id,
+            $validated['decision'],
+        )->onQueue('post_notifications');
 
         return response()->json([
             'message' => __('Demande d’intégration traitée.'),

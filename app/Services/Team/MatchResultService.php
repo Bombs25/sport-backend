@@ -3,6 +3,7 @@
 namespace App\Services\Team;
 
 use App\Jobs\Team\ApplyValidatedMatchResultStatsJob;
+use App\Support\PublicImageUrl;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,218 @@ use Illuminate\Validation\ValidationException;
  */
 class MatchResultService
 {
+    /** @var list<string> */
+    public const OPEN_DISPUTE_STATUSES = ['pending', 'under_review'];
+
+    public function resolvePublicMatchStatus(string $matchEventStatus, ?string $matchResultStatus, bool $hasOpenDispute): string
+    {
+        if ($hasOpenDispute) {
+            return 'disputed';
+        }
+
+        if ($matchResultStatus === 'score_pending_validation') {
+            return 'scores_to_confirm';
+        }
+
+        if ($matchResultStatus === 'refused') {
+            return 'score_refused';
+        }
+
+        if ($matchResultStatus === 'validated' || $matchEventStatus === 'finished') {
+            return 'finished';
+        }
+
+        return match ($matchEventStatus) {
+            'requested' => 'pending',
+            'scheduled' => 'accepted',
+            'cancelled' => 'refused',
+            default => $matchEventStatus,
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getMatchResultDetail(int $matchEventId, int $actorUserId): array
+    {
+        $match = $this->loadMatchEventOrFail($matchEventId);
+        $homeTeamId = (int) $match->home_team_id;
+        $awayTeamId = (int) $match->away_team_id;
+
+        if (! $this->userManagesTeam($homeTeamId, $actorUserId) && ! $this->userManagesTeam($awayTeamId, $actorUserId)) {
+            throw new AuthorizationException(__('Vous ne participez pas à ce match.'));
+        }
+
+        $result = DB::table('match_results')
+            ->where('match_event_id', $matchEventId)
+            ->orderByDesc('id')
+            ->first();
+
+        $dispute = $result !== null
+            ? DB::table('match_result_disputes')
+                ->where('match_result_id', $result->id)
+                ->orderByDesc('id')
+                ->first()
+            : null;
+
+        $hasOpenDispute = $dispute !== null && in_array($dispute->status, self::OPEN_DISPUTE_STATUSES, true);
+
+        $homeTeam = DB::table('teams')->where('id', $homeTeamId)->select(['id', 'name', 'logo_url'])->first();
+        $awayTeam = DB::table('teams')->where('id', $awayTeamId)->select(['id', 'name', 'logo_url'])->first();
+        $sport = DB::table('sports')
+            ->join('teams', 'teams.sport_id', '=', 'sports.id')
+            ->where('teams.id', $homeTeamId)
+            ->select(['sports.name as sport_name'])
+            ->first();
+
+        $publicStatus = $this->resolvePublicMatchStatus(
+            (string) $match->status,
+            $result?->status,
+            $hasOpenDispute,
+        );
+
+        $direction = $this->userManagesTeam($awayTeamId, $actorUserId) ? 'received' : 'sent';
+
+        return [
+            'match_event_id' => $matchEventId,
+            'direction' => $direction,
+            'status' => $publicStatus,
+            'scheduled_at' => $match->scheduled_at,
+            'venue' => $match->venue,
+            'notes' => $match->notes,
+            'home_team' => [
+                'id' => $homeTeamId,
+                'name' => $homeTeam?->name,
+                'logo_url' => PublicImageUrl::from($homeTeam?->logo_url ?? null),
+            ],
+            'away_team' => [
+                'id' => $awayTeamId,
+                'name' => $awayTeam?->name,
+                'logo_url' => PublicImageUrl::from($awayTeam?->logo_url ?? null),
+            ],
+            'sport' => ['name' => $sport?->sport_name ?? ''],
+            'result' => $result === null ? null : [
+                'match_result_id' => (int) $result->id,
+                'home_score' => (int) $result->home_score,
+                'away_score' => (int) $result->away_score,
+                'status' => $result->status,
+                'refusal_reason' => $result->refusal_reason,
+                'submitted_at' => $result->submitted_at,
+                'responded_at' => $result->responded_at,
+            ],
+            'dispute' => $dispute === null ? null : [
+                'match_result_dispute_id' => (int) $dispute->id,
+                'status' => $dispute->status,
+                'dispute_reason_score_incorrect' => (bool) $dispute->dispute_reason_score_incorrect,
+                'dispute_reason_fair_play' => (bool) $dispute->dispute_reason_fair_play,
+                'dispute_reason_behavior' => (bool) $dispute->dispute_reason_behavior,
+                'details' => $dispute->details,
+                'evidence_url' => $dispute->evidence_path !== null
+                    ? PublicImageUrl::from($dispute->evidence_path)
+                    : null,
+                'resolution_notes' => $dispute->resolution_notes,
+                'resolved_at' => $dispute->resolved_at,
+                'created_at' => $dispute->created_at,
+            ],
+            'has_open_dispute' => $hasOpenDispute,
+        ];
+    }
+
+    /**
+     * @param  array{resolution: string, resolution_notes?: string|null, home_score?: int|null, away_score?: int|null}  $payload
+     */
+    public function resolveDispute(int $matchResultDisputeId, int $actorUserId, array $payload): void
+    {
+        DB::transaction(function () use ($matchResultDisputeId, $actorUserId, $payload): void {
+            $dispute = DB::table('match_result_disputes')->where('id', $matchResultDisputeId)->first();
+            if ($dispute === null) {
+                throw ValidationException::withMessages([
+                    'match_result_dispute_id' => __('Litige introuvable.'),
+                ]);
+            }
+
+            if (! in_array($dispute->status, self::OPEN_DISPUTE_STATUSES, true)) {
+                throw ValidationException::withMessages([
+                    'match_result_dispute_id' => __('Ce litige est déjà clos.'),
+                ]);
+            }
+
+            $result = DB::table('match_results')->where('id', $dispute->match_result_id)->first();
+            if ($result === null) {
+                throw ValidationException::withMessages([
+                    'match_result_dispute_id' => __('Résultat introuvable.'),
+                ]);
+            }
+
+            $match = $this->loadMatchEventOrFail((int) $result->match_event_id);
+            $homeTeamId = (int) $match->home_team_id;
+            $awayTeamId = (int) $match->away_team_id;
+
+            if (! $this->userManagesTeam($homeTeamId, $actorUserId) && ! $this->userManagesTeam($awayTeamId, $actorUserId)) {
+                throw new AuthorizationException(__('Vous ne pouvez pas trancher ce litige.'));
+            }
+
+            $resolution = $payload['resolution'];
+            $notes = isset($payload['resolution_notes']) ? trim((string) $payload['resolution_notes']) : null;
+            $now = now();
+
+            if ($resolution === 'under_review') {
+                DB::table('match_result_disputes')->where('id', $dispute->id)->update([
+                    'status' => 'under_review',
+                    'moderator_user_id' => $actorUserId,
+                    'moderator_notes' => $notes,
+                    'updated_at' => $now,
+                ]);
+
+                return;
+            }
+
+            if ($resolution === 'resolved_away') {
+                $homeScore = $payload['home_score'] ?? null;
+                $awayScore = $payload['away_score'] ?? null;
+                if ($homeScore === null || $awayScore === null) {
+                    throw ValidationException::withMessages([
+                        'home_score' => __('Les scores arbitrés sont obligatoires.'),
+                    ]);
+                }
+
+                $this->forceValidateResult(
+                    $match,
+                    $result,
+                    $actorUserId,
+                    (int) $homeScore,
+                    (int) $awayScore,
+                );
+
+                DB::table('match_result_disputes')->where('id', $dispute->id)->update([
+                    'status' => 'resolved_away',
+                    'moderator_user_id' => $actorUserId,
+                    'resolution_notes' => $notes,
+                    'resolved_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                return;
+            }
+
+            if ($resolution === 'resolved_home' || $resolution === 'dismissed') {
+                DB::table('match_result_disputes')->where('id', $dispute->id)->update([
+                    'status' => $resolution,
+                    'moderator_user_id' => $actorUserId,
+                    'resolution_notes' => $notes,
+                    'resolved_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+                return;
+            }
+
+            throw ValidationException::withMessages([
+                'resolution' => __('Résolution invalide.'),
+            ]);
+        });
+    }
+
     /**
      * @param  int  $actorTeamId  Doit être `home_team_id` du match (équipe demanderesse / domicile) — seul son capitaine ou créateur peut soumettre.
      * @param  int  $actorUserId  Utilisateur authentifié (capitaine ou créateur de `$actorTeamId`).
@@ -474,7 +687,42 @@ class MatchResultService
     {
         return DB::table('match_result_disputes')
             ->where('match_result_id', $matchResultId)
-            ->whereIn('status', ['pending', 'under_review'])
+            ->whereIn('status', self::OPEN_DISPUTE_STATUSES)
             ->exists();
+    }
+
+    private function forceValidateResult(object $match, object $result, int $actorUserId, int $homeScore, int $awayScore): void
+    {
+        $matchEventId = (int) $match->id;
+        $homeTeamId = (int) $match->home_team_id;
+        $awayTeamId = (int) $match->away_team_id;
+        $now = now();
+
+        DB::table('match_results')
+            ->where('id', $result->id)
+            ->update([
+                'home_score' => $homeScore,
+                'away_score' => $awayScore,
+                'status' => 'validated',
+                'responded_by_user_id' => $actorUserId,
+                'responded_at' => $now,
+                'validated_at' => $now,
+                'refusal_reason' => null,
+                'updated_at' => $now,
+            ]);
+
+        DB::table('match_events')
+            ->where('id', $matchEventId)
+            ->update([
+                'status' => 'finished',
+                'updated_at' => $now,
+            ]);
+
+        ApplyValidatedMatchResultStatsJob::dispatch(
+            $homeTeamId,
+            $awayTeamId,
+            $homeScore,
+            $awayScore,
+        )->afterCommit();
     }
 }

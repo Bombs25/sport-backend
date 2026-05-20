@@ -17,6 +17,7 @@ class TeamService
 {
     public function __construct(
         private readonly TypesenseTeamService $typesenseTeams,
+        private readonly MatchResultService $matchResults,
     ) {}
 
     /**
@@ -297,7 +298,7 @@ class TeamService
     }
 
     /**
-     * Permet à un membre de quitter son équipe ou à un créateur/captain actif de retirer un membre.
+     * Permet à un membre de quitter son équipe ou à un capitaine actif de retirer un membre.
      *
      * @throws AuthorizationException
      * @throws ValidationException
@@ -318,7 +319,7 @@ class TeamService
 
         $isSelfLeave = $actorUserId === $memberUserId;
         if (! $isSelfLeave) {
-            $this->ensureCanManageIntegrations($team, $actorUserId);
+            $this->ensureActiveCaptain($team->id, $actorUserId);
         }
 
         if ((int) $team->creator_id === $memberUserId) {
@@ -339,7 +340,15 @@ class TeamService
     /**
      * Retourne le statut du user connecté vis-à-vis d'une équipe.
      *
-     * @return array{team_id: int, is_member: bool, integration_requested: bool, membership_status: string|null, role: string|null}
+     * @return array{
+     *   team_id: int,
+     *   is_member: bool,
+     *   integration_requested: bool,
+     *   membership_status: string|null,
+     *   role: string|null,
+     *   match_request_pending: bool,
+     *   match_request_sent: bool,
+     * }
      */
     public function membershipStatus(Team $team, int $userId): array
     {
@@ -351,12 +360,43 @@ class TeamService
 
         $membershipStatus = $membership?->status;
 
+        $managedTeamIds = $this->manageableTeamIdsForUser($userId);
+        $matchRequestPending = false;
+        $matchRequestSent = false;
+
+        if ($managedTeamIds !== []) {
+            $pendingMatch = DB::table('match_events')
+                ->where('status', 'requested')
+                ->where(function ($query) use ($managedTeamIds, $team): void {
+                    $query
+                        ->where(function ($pairQuery) use ($managedTeamIds, $team): void {
+                            $pairQuery
+                                ->whereIn('home_team_id', $managedTeamIds)
+                                ->where('away_team_id', $team->id);
+                        })
+                        ->orWhere(function ($pairQuery) use ($managedTeamIds, $team): void {
+                            $pairQuery
+                                ->where('home_team_id', $team->id)
+                                ->whereIn('away_team_id', $managedTeamIds);
+                        });
+                })
+                ->select(['home_team_id'])
+                ->first();
+
+            if ($pendingMatch !== null) {
+                $matchRequestPending = true;
+                $matchRequestSent = in_array((int) $pendingMatch->home_team_id, $managedTeamIds, true);
+            }
+        }
+
         return [
             'team_id' => (int) $team->id,
             'is_member' => $membershipStatus === 'active',
             'integration_requested' => $membershipStatus === 'pending',
             'membership_status' => $membershipStatus,
             'role' => $membership?->role,
+            'match_request_pending' => $matchRequestPending,
+            'match_request_sent' => $matchRequestSent,
         ];
     }
 
@@ -573,6 +613,18 @@ class TeamService
             ]);
         }
 
+        $isActiveMemberOfAwayTeam = DB::table('team_members')
+            ->where('team_id', $awayTeamId)
+            ->where('user_id', $actorUserId)
+            ->where('status', 'active')
+            ->exists();
+
+        if ($isActiveMemberOfAwayTeam) {
+            throw ValidationException::withMessages([
+                'away_team_id' => __('Vous ne pouvez pas demander un match contre une équipe dont vous faites partie.'),
+            ]);
+        }
+
         if ((int) $homeTeam->sport_id !== (int) $awayTeam->sport_id) {
             throw ValidationException::withMessages([
                 'away_team_id' => __('La demande de match est possible uniquement entre deux équipes du même sport.'),
@@ -651,14 +703,27 @@ class TeamService
         $canManageMatchRequests = $managedTeamIds !== [];
 
         $safeType = $type === 'sent' ? 'sent' : 'received';
-        $safeStatus = in_array($status, ['pending', 'accepted', 'refused', 'scores_to_confirm', 'finished'], true) ? $status : null;
+        $safeStatus = in_array(
+            $status,
+            ['pending', 'accepted', 'confirmed', 'refused', 'scores_to_confirm', 'score_refused', 'disputed', 'finished'],
+            true,
+        ) ? $status : null;
         $safeSportName = $sportName !== null ? trim($sportName) : null;
         $safeScheduledDate = $scheduledAt !== null ? date('Y-m-d', strtotime($scheduledAt)) : null;
         $safePage = max(1, $page);
         $perPage = 10;
 
         $baseQuery = DB::table('match_events')
-            ->leftJoin('match_results', 'match_results.match_event_id', '=', 'match_events.id')
+            ->leftJoin('match_results', static function ($join): void {
+                $join->on('match_results.match_event_id', '=', 'match_events.id')
+                    ->whereRaw(
+                        'match_results.id = (
+                            SELECT MAX(mr.id)
+                            FROM match_results AS mr
+                            WHERE mr.match_event_id = match_events.id
+                        )',
+                    );
+            })
             ->join('teams as home_teams', 'home_teams.id', '=', 'match_events.home_team_id')
             ->join('teams as away_teams', 'away_teams.id', '=', 'match_events.away_team_id')
             ->join('sports', 'sports.id', '=', 'home_teams.sport_id')
@@ -680,6 +745,12 @@ class TeamService
                     return;
                 }
 
+                if ($safeStatus === 'confirmed') {
+                    $query->whereIn('match_events.status', ['scheduled', 'finished']);
+
+                    return;
+                }
+
                 if ($safeStatus === 'finished') {
                     $query->where('match_events.status', 'finished');
 
@@ -693,9 +764,29 @@ class TeamService
                 }
 
                 if ($safeStatus === 'refused') {
-                    $query->where(function ($q): void {
-                        $q->where('match_events.status', 'cancelled')
-                            ->orWhere('match_results.status', 'refused');
+                    $query->where('match_events.status', 'cancelled');
+
+                    return;
+                }
+
+                if ($safeStatus === 'score_refused') {
+                    $query->where('match_results.status', 'refused')
+                        ->whereNotExists(function ($q): void {
+                            $q->select(DB::raw(1))
+                                ->from('match_result_disputes')
+                                ->whereColumn('match_result_disputes.match_result_id', 'match_results.id')
+                                ->whereIn('match_result_disputes.status', MatchResultService::OPEN_DISPUTE_STATUSES);
+                        });
+
+                    return;
+                }
+
+                if ($safeStatus === 'disputed') {
+                    $query->whereExists(function ($q): void {
+                        $q->select(DB::raw(1))
+                            ->from('match_result_disputes')
+                            ->whereColumn('match_result_disputes.match_result_id', 'match_results.id')
+                            ->whereIn('match_result_disputes.status', MatchResultService::OPEN_DISPUTE_STATUSES);
                     });
                 }
             })
@@ -706,7 +797,7 @@ class TeamService
                 $query->where('sports.name', $safeSportName);
             });
 
-        $total = (int) (clone $baseQuery)->count();
+        $total = (int) (clone $baseQuery)->distinct('match_events.id')->count('match_events.id');
         $lastPage = max(1, (int) ceil($total / $perPage));
 
         $rows = $baseQuery
@@ -717,16 +808,43 @@ class TeamService
                 'match_events.home_team_id',
                 'match_events.away_team_id',
                 'home_teams.name as home_team_name',
+                'home_teams.logo_url as home_team_logo_url',
                 'away_teams.name as away_team_name',
+                'away_teams.logo_url as away_team_logo_url',
                 'sports.name as sport_name',
                 'sports.practice_type as sport_practice_type',
                 'match_events.scheduled_at',
                 'match_events.venue',
+                'match_events.notes',
                 'match_events.status',
+                'match_results.id as match_result_id',
                 'match_results.status as match_result_status',
+                'match_results.home_score',
+                'match_results.away_score',
+                'match_results.refusal_reason',
                 'match_events.created_at',
             ])
             ->get();
+
+        $matchResultIds = $rows
+            ->pluck('match_result_id')
+            ->filter()
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $openDisputeByResultId = [];
+        if ($matchResultIds !== []) {
+            $openDisputeByResultId = DB::table('match_result_disputes')
+                ->whereIn('match_result_id', $matchResultIds)
+                ->whereIn('status', MatchResultService::OPEN_DISPUTE_STATUSES)
+                ->get(['match_result_id', 'id'])
+                ->mapWithKeys(static fn (object $disputeRow): array => [
+                    (int) $disputeRow->match_result_id => (int) $disputeRow->id,
+                ])
+                ->all();
+        }
 
         $collectiveTeamIds = $rows
             ->filter(static fn (object $row): bool => $row->sport_practice_type === 'collective')
@@ -743,19 +861,24 @@ class TeamService
             'sport_name' => $safeSportName,
             'can_manage_match_requests' => $canManageMatchRequests,
             'items' => $rows->map(
-                static function (object $row) use ($safeType, $membersByTeamId): array {
+                function (object $row) use ($safeType, $membersByTeamId, $openDisputeByResultId): array {
                     $isReceived = $safeType === 'received';
-                    $publicStatus = match ($row->match_result_status) {
-                        'score_pending_validation' => 'scores_to_confirm',
-                        'refused' => 'refused',
-                        default => match ($row->status) {
-                            'requested' => 'pending',
-                            'scheduled' => 'accepted',
-                            'cancelled' => 'refused',
-                            'finished' => 'finished',
-                            default => $row->status,
-                        },
-                    };
+                    $matchResultId = $row->match_result_id !== null ? (int) $row->match_result_id : null;
+                    $hasOpenDispute = $matchResultId !== null && isset($openDisputeByResultId[$matchResultId]);
+
+                    $publicStatus = $this->matchResults->resolvePublicMatchStatus(
+                        (string) $row->status,
+                        $row->match_result_status,
+                        $hasOpenDispute,
+                    );
+
+                    $proposedScore = null;
+                    if ($matchResultId !== null && $row->home_score !== null && $row->away_score !== null) {
+                        $proposedScore = [
+                            'home' => (int) $row->home_score,
+                            'away' => (int) $row->away_score,
+                        ];
+                    }
 
                     $item = [
                         'match_event_id' => (int) $row->match_event_id,
@@ -763,13 +886,19 @@ class TeamService
                         'status' => $publicStatus,
                         'scheduled_at' => $row->scheduled_at,
                         'venue' => $row->venue,
+                        'notes' => $row->notes,
+                        'has_open_dispute' => $hasOpenDispute,
+                        'refusal_reason' => $row->refusal_reason,
+                        'proposed_score' => $proposedScore,
                         'home_team' => [
                             'id' => (int) $row->home_team_id,
                             'name' => $row->home_team_name,
+                            'logo_url' => PublicImageUrl::from($row->home_team_logo_url ?? null),
                         ],
                         'away_team' => [
                             'id' => (int) $row->away_team_id,
                             'name' => $row->away_team_name,
+                            'logo_url' => PublicImageUrl::from($row->away_team_logo_url ?? null),
                         ],
                         'sport' => [
                             'name' => $row->sport_name,
@@ -840,6 +969,62 @@ class TeamService
     }
 
     /**
+     * Modifie une demande de match envoyée (équipe demanderesse uniquement).
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function updateMatchRequest(
+        int $matchEventId,
+        int $actorUserId,
+        string $scheduledAt,
+        ?string $venue = null,
+        ?string $notes = null,
+    ): void {
+        $matchEvent = $this->findPendingMatchRequestForHomeActor($matchEventId, $actorUserId);
+
+        $hasSameDateForRequester = DB::table('match_events')
+            ->where('home_team_id', $matchEvent->home_team_id)
+            ->where('status', 'requested')
+            ->where('scheduled_at', $scheduledAt)
+            ->where('id', '!=', $matchEventId)
+            ->exists();
+
+        if ($hasSameDateForRequester) {
+            throw ValidationException::withMessages([
+                'scheduled_at' => __('Cette équipe a déjà une demande de match en cours à cette date.'),
+            ]);
+        }
+
+        DB::table('match_events')
+            ->where('id', $matchEventId)
+            ->update([
+                'scheduled_at' => $scheduledAt,
+                'venue' => $venue,
+                'notes' => $notes,
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
+     * Annule une demande de match envoyée (équipe demanderesse uniquement).
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function cancelMatchRequest(int $matchEventId, int $actorUserId): void
+    {
+        $this->findPendingMatchRequestForHomeActor($matchEventId, $actorUserId);
+
+        DB::table('match_events')
+            ->where('id', $matchEventId)
+            ->update([
+                'status' => 'cancelled',
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
      * Accepte ou refuse une demande de match reçue.
      *
      * @throws AuthorizationException
@@ -875,6 +1060,39 @@ class TeamService
                 'status' => $decision === 'accept' ? 'scheduled' : 'cancelled',
                 'updated_at' => now(),
             ]);
+    }
+
+    /**
+     * @return object{ id: int, home_team_id: int, away_team_id: int, status: string }
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    private function findPendingMatchRequestForHomeActor(int $matchEventId, int $actorUserId): object
+    {
+        $matchEvent = DB::table('match_events')
+            ->where('id', $matchEventId)
+            ->select(['id', 'home_team_id', 'away_team_id', 'status'])
+            ->first();
+
+        if ($matchEvent === null) {
+            throw ValidationException::withMessages([
+                'match_event_id' => __('Demande de match introuvable.'),
+            ]);
+        }
+
+        $this->ensureCanRequestMatch(
+            Team::query()->findOrFail((int) $matchEvent->home_team_id),
+            $actorUserId
+        );
+
+        if ($matchEvent->status !== 'requested') {
+            throw ValidationException::withMessages([
+                'match_event_id' => __('Cette demande de match n’est plus en attente.'),
+            ]);
+        }
+
+        return $matchEvent;
     }
 
     /**
@@ -1083,8 +1301,16 @@ class TeamService
             return;
         }
 
+        $this->ensureActiveCaptain($team->id, $actorUserId);
+    }
+
+    /**
+     * @throws AuthorizationException
+     */
+    private function ensureActiveCaptain(int $teamId, int $actorUserId): void
+    {
         $isActiveCaptain = DB::table('team_members')
-            ->where('team_id', $team->id)
+            ->where('team_id', $teamId)
             ->where('user_id', $actorUserId)
             ->where('status', 'active')
             ->where('role', 'captain')

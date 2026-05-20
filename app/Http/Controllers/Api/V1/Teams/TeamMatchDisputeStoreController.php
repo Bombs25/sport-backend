@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Teams;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Teams\TeamMatchDisputeStoreRequest;
+use App\Jobs\TeamMatchDisputeNotificationJob;
 use App\Services\Team\MatchResultService;
 use Illuminate\Http\JsonResponse;
 
@@ -25,9 +26,11 @@ class TeamMatchDisputeStoreController extends Controller
             $evidencePath = $request->file('evidence')->store('match-disputes', $evidenceDisk);
         }
 
+        $actorUserId = (int) $request->user()->id;
+
         $disputeId = $service->openDispute(
             $match_event_id,
-            (int) $request->user()->id,
+            $actorUserId,
             [
                 'dispute_reason_score_incorrect' => $validated['dispute_reason_score_incorrect'],
                 'dispute_reason_fair_play' => $validated['dispute_reason_fair_play'],
@@ -37,6 +40,9 @@ class TeamMatchDisputeStoreController extends Controller
             $evidencePath,
             $evidenceDisk,
         );
+
+        TeamMatchDisputeNotificationJob::dispatch($match_event_id, $actorUserId, $disputeId)
+            ->onQueue('post_notifications');
 
         return response()->json([
             'message' => __('Litige envoyé.'),
