@@ -24,4 +24,15 @@ class PostStoreRequest extends FormRequest
             'media.*' => ['file', new RasterImageFile],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'media.*.uploaded' => 'La photo n’a pas pu être envoyée.',
+            'media.*.file' => 'Chaque photo doit être un fichier image valide.',
+        ];
+    }
 }

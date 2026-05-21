@@ -6,6 +6,7 @@ use App\Enums\ImageVariantLongEdge;
 use App\Events\ImageProcessingEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Posts\PostStoreRequest;
+use App\Jobs\RegularPostPublishedNotificationJob;
 use App\Services\Post\PostService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
@@ -39,6 +40,9 @@ class PostStoreController extends Controller
                 type: 'post',
             );
         }
+
+        RegularPostPublishedNotificationJob::dispatch((int) $post['id'], (int) $request->user()->id)
+            ->onQueue('post_notifications');
 
         return response()->json([
             'data' => $post,
