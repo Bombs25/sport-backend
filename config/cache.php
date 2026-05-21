@@ -79,7 +79,7 @@ return [
         ],
 
         'app_main_cache' => [
-            'driver' => 'redis',
+            'driver' => env('APP_MAIN_CACHE_DRIVER', 'redis'),
             'connection' => env('REDIS_APP_MAIN_CACHE_CONNECTION', 'app_main_cache'),
             'lock_connection' => env('REDIS_APP_MAIN_CACHE_LOCK_CONNECTION', 'default'),
         ],

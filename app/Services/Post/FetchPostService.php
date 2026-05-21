@@ -725,39 +725,42 @@ class FetchPostService
      */
     public function resolveViewedMatchResultIds(int $viewerUserId, array $clientViewedMatchResultIds): array
     {
-        $normalized = array_values(array_unique(array_map(
-            static fn (int|string $id): int => (int) $id,
-            $clientViewedMatchResultIds,
-        )));
+        // Union : liste envoyée par le client (session courante) + historique persistant
+        // (`user_post_views`). Sans cette union, dès que le client renvoie ses IDs de
+        // session le serveur oublierait la base et les match_results déjà vus
+        // réapparaîtraient (2e page, session suivante, MMKV partiel...).
+        return collect($clientViewedMatchResultIds)
+            ->concat($this->serverSideViewedMatchResultIds($viewerUserId))
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
 
-        if ($normalized !== []) {
-            return $normalized;
-        }
-
+    /**
+     * Identifiants de `match_results` déjà vus, persistés côté serveur (cache Redis, sinon `user_post_views`).
+     *
+     * @return array<int, int>
+     */
+    private function serverSideViewedMatchResultIds(int $viewerUserId): array
+    {
         $cacheKey = $this->viewedMatchResultsCacheKey($viewerUserId);
 
         if (Cache::store('app_main_cache')->has($cacheKey)) {
-            $cachedViewedIds = collect(Cache::store('app_main_cache')->get($cacheKey, []))
-                ->map(fn (mixed $id): int => (int) $id)
-                ->filter(fn (int $id): bool => $id > 0)
+            return collect(Cache::store('app_main_cache')->get($cacheKey, []))
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->filter(static fn (int $id): bool => $id > 0)
                 ->unique()
                 ->values()
                 ->all();
-
-            // Log::info('Viewed match result IDs loaded from cache.', [
-            //     'user_id' => $viewerUserId,
-            //     'cache_key' => $cacheKey,
-            //     'ids' => $cachedViewedIds,
-            // ]);
-
-            return $cachedViewedIds;
         }
 
         $viewedIds = DB::table('user_post_views')
             ->where('user_id', $viewerUserId)
             ->where('publication_type', self::PUBLICATION_TYPE_MATCH_RESULT)
             ->pluck('publication_id')
-            ->map(fn (mixed $id): int => (int) $id)
+            ->map(static fn (mixed $id): int => (int) $id)
             ->all();
 
         Cache::store('app_main_cache')->forever($cacheKey, $viewedIds);
@@ -823,17 +826,26 @@ class FetchPostService
      */
     public function resolveViewedRegularPostIds(int $viewerUserId, array $clientViewedRegularPostIds): array
     {
-        $normalized = collect($clientViewedRegularPostIds)
+        // Union : liste envoyée par le client (session courante) + historique persistant
+        // (`user_post_views`). Sans cette union, dès que le client renvoie ses IDs de
+        // session le serveur oublierait la base et les posts déjà vus réapparaîtraient
+        // (2e page, session suivante, MMKV partiel...).
+        return collect($clientViewedRegularPostIds)
+            ->concat($this->serverSideViewedRegularPostIds($viewerUserId))
             ->map(static fn (mixed $id): int => (int) $id)
             ->filter(static fn (int $id): bool => $id > 0)
             ->unique()
             ->values()
             ->all();
+    }
 
-        if ($normalized !== []) {
-            return $normalized;
-        }
-
+    /**
+     * Identifiants de posts réguliers déjà vus, persistés côté serveur (cache Redis, sinon `user_post_views`).
+     *
+     * @return array<int, int>
+     */
+    private function serverSideViewedRegularPostIds(int $viewerUserId): array
+    {
         $cacheKey = $this->viewedRegularPostsCacheKey($viewerUserId);
 
         if (Cache::store('app_main_cache')->has($cacheKey)) {

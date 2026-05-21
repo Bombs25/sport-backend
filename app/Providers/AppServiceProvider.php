@@ -7,12 +7,14 @@ use App\Contracts\Stats\SeasonStrategy;
 use App\Contracts\Stats\StatsRepository;
 use App\Contracts\Teams\TeamMatchReadRepository;
 use App\Events\ImageProcessingEvent;
+use App\Listeners\FlushAppMainCacheOnDatabaseRefreshed;
 use App\Listeners\ImageProcessingListener;
 use App\Repositories\Stats\QueryBuilderStatsRepository;
 use App\Repositories\Teams\QueryBuilderTeamMatchReadRepository;
 use App\Services\Files\ImageProcessing;
 use App\Services\Stats\AnnualSeasonStrategy;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\DatabaseRefreshed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
@@ -60,6 +62,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(ImageProcessingEvent::class, ImageProcessingListener::class);
+
+        // `migrate:fresh` / `migrate:refresh` reconstruisent la base : on vide le
+        // cache applicatif Redis (`app_main_cache`) dans la foulée. Exclu des tests :
+        // `RefreshDatabase` déclenche un `migrate:fresh` interne, et on ne veut pas
+        // vider le Redis applicatif à chaque exécution de la suite.
+        if (! $this->app->runningUnitTests()) {
+            Event::listen(DatabaseRefreshed::class, FlushAppMainCacheOnDatabaseRefreshed::class);
+        }
 
         RateLimiter::for('auth-login', function (Request $request) {
             $email = Str::lower((string) $request->input('email', ''));

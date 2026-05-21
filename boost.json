@@ -8,6 +8,10 @@
     "nightwatch_mcp": false,
     "sail": false,
     "skills": [
-        "laravel-best-practices"
+        "cashier-stripe-development",
+        "laravel-best-practices",
+        "scout-development",
+        "echo-development",
+        "tailwindcss-development"
     ]
 }
