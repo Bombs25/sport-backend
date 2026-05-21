@@ -5,35 +5,42 @@ namespace App\Http\Controllers\Api\V1\Posts;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Posts\PostCommentLikeToggleRequest;
 use App\Jobs\CommentLikeNotificationJob;
-use App\Jobs\ToggleCommentLike;
+use App\Services\Post\CommentLikeService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Bus;
 
 class PostCommentLikeToggleController extends Controller
 {
-    public function __invoke(PostCommentLikeToggleRequest $request): JsonResponse
+    public function __invoke(PostCommentLikeToggleRequest $request, CommentLikeService $service): JsonResponse
     {
         $validated = $request->validated();
+        $userId = (int) $request->user()->id;
 
-        Bus::chain([
-            new ToggleCommentLike(
+        $result = $service->toggleLike(
+            (int) $validated['post_id'],
+            (int) $validated['comment_id'],
+            $userId,
+            (string) $validated['post_type'],
+            (string) $validated['action'],
+        );
+
+        $notifyOwner = (int) $result['comment_owner_id'] !== $userId;
+
+        if ($result['changed'] && $validated['action'] === 'like' && $notifyOwner) {
+            CommentLikeNotificationJob::dispatch(
                 (int) $validated['post_id'],
                 (int) $validated['comment_id'],
-                (int) $request->user()->id,
+                $userId,
                 (string) $validated['post_type'],
-                (string) $validated['action'],
-            ),
-            new CommentLikeNotificationJob(
-                (int) $validated['post_id'],
-                (int) $validated['comment_id'],
-                (int) $request->user()->id,
-                (string) $validated['post_type'],
-                (string) $validated['action'],
-            ),
-        ])->onQueue('post_notifications')->dispatch();
+                'like',
+            )->onQueue('post_notifications');
+        }
 
         return response()->json([
-            'message' => __('Traitement du like/dislike en cours.'),
-        ], 202);
+            'data' => [
+                'liked' => $result['liked'],
+                'likes_count' => $result['likes_count'],
+            ],
+            'message' => __('Like mis à jour.'),
+        ]);
     }
 }

@@ -10,6 +10,8 @@ class CommentLikeService
     /**
      * Applique un like/dislike de commentaire de manière transactionnelle (ACID).
      *
+     * L'auteur du commentaire peut liker son propre commentaire (aucune restriction ici).
+     *
      * @return array{liked: bool, changed: bool, likes_count: int, comment_owner_id: int}
      *
      * @throws ValidationException

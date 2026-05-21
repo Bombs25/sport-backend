@@ -39,27 +39,14 @@ trait SendsMatchTeamNotifications
                 $message,
             ));
 
-            $rawToken = $recipient->fcm_token;
-            if (! is_string($rawToken) || $rawToken === '') {
-                logger()->warning(static::class.': destinataire sans fcm_token.', [
-                    'recipient_id' => $recipient->id,
-                    'match_event_id' => $matchEventId,
-                ]);
+            $expoToken = $recipient->routeNotificationForFcm();
 
-                continue;
-            }
-
-            if (! str_starts_with($rawToken, 'ExponentPushToken[')) {
-                logger()->warning(static::class.': fcm_token n\'est pas un jeton Expo.', [
-                    'recipient_id' => $recipient->id,
-                    'match_event_id' => $matchEventId,
-                ]);
-
+            if ($expoToken === null) {
                 continue;
             }
 
             $expoPushService->send(
-                [$rawToken],
+                [$expoToken],
                 $title,
                 $message,
                 null,

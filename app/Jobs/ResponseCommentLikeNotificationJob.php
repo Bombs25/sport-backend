@@ -79,12 +79,11 @@ class ResponseCommentLikeNotificationJob implements ShouldQueue
             $actorName,
         ));
 
-        $expoTokens = collect([$recipient])
-            ->map(static fn (User $user) => $user->routeNotificationForFcm())
-            ->flatten()
-            ->filter(static fn ($token): bool => is_string($token) && $token !== '')
-            ->values()
-            ->all();
+        $expoTokens = User::expoPushTokensFrom([$recipient]);
+
+        if ($expoTokens === []) {
+            return;
+        }
 
         $data = [
             'publication_id' => $this->publicationId,

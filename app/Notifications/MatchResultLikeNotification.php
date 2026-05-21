@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\PostPublicationNotificationMessages;
 use Illuminate\Notifications\Notification;
 
 class MatchResultLikeNotification extends Notification
@@ -30,7 +31,10 @@ class MatchResultLikeNotification extends Notification
             'publication_id' => $this->matchResultId,
             'publication_type' => $this->publicationType,
             'user_id' => $this->actorUserId,
-            'message' => ($this->actorName ?? 'Un utilisateur').' a aime le resultat de ce match',
+            'message' => PostPublicationNotificationMessages::likeMessage(
+                $this->publicationType,
+                $this->actorName,
+            ),
         ];
     }
 }

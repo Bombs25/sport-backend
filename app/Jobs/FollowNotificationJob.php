@@ -96,24 +96,13 @@ class FollowNotificationJob implements ShouldQueue
             $message,
         ));
 
-        $rawToken = $recipient->fcm_token;
-        if (! is_string($rawToken) || $rawToken === '') {
-            logger()->warning('FollowNotificationJob: destinataire sans fcm_token.', [
-                'recipient_id' => $this->recipientUserId,
-            ]);
+        $expoToken = $recipient->routeNotificationForFcm();
 
+        if ($expoToken === null) {
             return;
         }
 
-        if (! str_starts_with($rawToken, 'ExponentPushToken[')) {
-            logger()->warning('FollowNotificationJob: fcm_token n\'est pas un jeton Expo (probable FCM natif en base).', [
-                'recipient_id' => $this->recipientUserId,
-            ]);
-
-            return;
-        }
-
-        $expoTokens = [$rawToken];
+        $expoTokens = [$expoToken];
 
         $data = [
             'kind' => $this->kind,

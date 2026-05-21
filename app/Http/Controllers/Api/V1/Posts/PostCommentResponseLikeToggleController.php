@@ -5,37 +5,46 @@ namespace App\Http\Controllers\Api\V1\Posts;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Posts\PostCommentResponseLikeToggleRequest;
 use App\Jobs\ResponseCommentLikeNotificationJob;
-use App\Jobs\ToggleResponseCommentLike;
+use App\Services\Post\ResponseCommentLikeService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Bus;
 
 class PostCommentResponseLikeToggleController extends Controller
 {
-    public function __invoke(PostCommentResponseLikeToggleRequest $request): JsonResponse
-    {
+    public function __invoke(
+        PostCommentResponseLikeToggleRequest $request,
+        ResponseCommentLikeService $service,
+    ): JsonResponse {
         $validated = $request->validated();
+        $userId = (int) $request->user()->id;
 
-        Bus::chain([
-            new ToggleResponseCommentLike(
+        $result = $service->toggleLike(
+            (int) $validated['post_id'],
+            (int) $validated['comment_id'],
+            (int) $validated['response_id'],
+            $userId,
+            (string) $validated['post_type'],
+            (string) $validated['action'],
+        );
+
+        $notifyOwner = (int) $result['response_owner_id'] !== $userId;
+
+        if ($result['changed'] && $validated['action'] === 'like' && $notifyOwner) {
+            ResponseCommentLikeNotificationJob::dispatch(
                 (int) $validated['post_id'],
                 (int) $validated['comment_id'],
                 (int) $validated['response_id'],
-                (int) $request->user()->id,
+                $userId,
                 (string) $validated['post_type'],
-                (string) $validated['action'],
-            ),
-            new ResponseCommentLikeNotificationJob(
-                (int) $validated['post_id'],
-                (int) $validated['comment_id'],
-                (int) $validated['response_id'],
-                (int) $request->user()->id,
-                (string) $validated['post_type'],
-                (string) $validated['action'],
-            ),
-        ])->onQueue('post_notifications')->dispatch();
+                'like',
+            )->onQueue('post_notifications');
+        }
 
         return response()->json([
-            'message' => __('Traitement du like/dislike de la réponse en cours.'),
-        ], 202);
+            'data' => [
+                'liked' => $result['liked'],
+                'likes_count' => $result['likes_count'],
+            ],
+            'message' => __('Like mis à jour.'),
+        ]);
     }
 }

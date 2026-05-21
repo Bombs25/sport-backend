@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\MatchResultLikeNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\PostPublicationNotificationMessages;
+use App\Support\PostPublicationNotificationRecipients;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -50,35 +52,29 @@ class MatchResultLikeNotificationJob implements ShouldQueue
             return;
         }
 
-        $teamIds = DB::table('match_results')
-            ->join('match_events', 'match_events.id', '=', 'match_results.match_event_id')
-            ->where('match_results.id', $this->matchResultId)
-            ->select(['match_events.home_team_id', 'match_events.away_team_id'])
-            ->first();
+        $logContext = self::class.'#'.$this->matchResultId;
+        $users = PostPublicationNotificationRecipients::usersFor(
+            $this->matchResultId,
+            $this->publicationType,
+            $this->actorUserId,
+        );
 
-        if ($teamIds === null) {
-            return;
-        }
-
-        $userIds = DB::table('team_members')
-            ->whereIn('team_id', [$teamIds->home_team_id, $teamIds->away_team_id])
-            ->where('status', 'active')
-            ->where('user_id', '!=', $this->actorUserId)
-            ->distinct()
-            ->pluck('user_id');
-
-        if ($userIds->isEmpty()) {
-            return;
-        }
-
-        $users = User::query()->whereIn('id', $userIds)->get();
+        logger()->debug('MatchResultLikeNotificationJob: destinataires', [
+            'publication_id' => $this->matchResultId,
+            'publication_type' => $this->publicationType,
+            'actor_user_id' => $this->actorUserId,
+            'recipient_user_ids' => $users->pluck('id')->all(),
+            'fcm_token_db_par_user' => $users->mapWithKeys(static fn (User $user): array => [
+                $user->id => User::formatTokenForLog($user->fcm_token),
+            ])->all(),
+        ]);
 
         if ($users->isEmpty()) {
             return;
         }
 
         $actorName = User::query()->whereKey($this->actorUserId)->value('name');
-        $message = ($actorName ?? 'Un utilisateur').' a aime le resultat de ce match';
+        $message = PostPublicationNotificationMessages::likeMessage($this->publicationType, $actorName);
         $title = $actorName ?? 'Un utilisateur';
 
         Notification::send($users, new MatchResultLikeNotification(
@@ -88,12 +84,17 @@ class MatchResultLikeNotificationJob implements ShouldQueue
             $actorName,
         ));
 
-        $expoTokens = $users
-            ->map(static fn (User $user) => $user->routeNotificationForFcm())
-            ->flatten()
-            ->filter(static fn ($token): bool => is_string($token) && $token !== '')
-            ->values()
-            ->all();
+        $expoTokens = User::expoPushTokensFrom($users, $logContext);
+
+        if ($expoTokens === []) {
+            logger()->warning('MatchResultLikeNotificationJob: aucun jeton Expo exploitable', [
+                'publication_id' => $this->matchResultId,
+                'publication_type' => $this->publicationType,
+                'recipient_user_ids' => $users->pluck('id')->all(),
+            ]);
+
+            return;
+        }
 
         $data = [
             'publication_id' => $this->matchResultId,

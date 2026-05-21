@@ -132,7 +132,7 @@ class MatchResultLikeApiTest extends TestCase
         $ctx = $this->createScheduledMatch();
         $resultId = $this->insertMatchResult($ctx['match_event_id'], $ctx['home_captain']->id);
 
-        $toggle = new ToggleMatchResultLike($resultId, $ctx['away_captain']->id, 'regular', 'like');
+        $toggle = new ToggleMatchResultLike($resultId, $ctx['away_captain']->id, 'automatic', 'like');
         $toggle->onConnection('post_notifications');
         Bus::dispatch($toggle);
 
@@ -145,11 +145,11 @@ class MatchResultLikeApiTest extends TestCase
         $resultId = $this->insertMatchResult($ctx['match_event_id'], $ctx['home_captain']->id);
 
         Bus::chain([
-            new ToggleMatchResultLike($resultId, $ctx['away_captain']->id, 'regular', 'like'),
+            new ToggleMatchResultLike($resultId, $ctx['away_captain']->id, 'automatic', 'like'),
             new MatchResultLikeNotificationJob(
                 $resultId,
                 $ctx['away_captain']->id,
-                'regular',
+                'automatic',
                 'like',
             ),
         ])->onConnection('post_notifications')->dispatch();
@@ -165,7 +165,7 @@ class MatchResultLikeApiTest extends TestCase
         dispatch_sync(new ToggleMatchResultLike(
             $resultId,
             $ctx['away_captain']->id,
-            'regular',
+            'automatic',
             'like',
         ));
 
@@ -180,7 +180,7 @@ class MatchResultLikeApiTest extends TestCase
         app(MatchResultLikeService::class)->toggleLike(
             $resultId,
             $ctx['away_captain']->id,
-            'regular',
+            'automatic',
             'like',
         );
 
@@ -195,14 +195,14 @@ class MatchResultLikeApiTest extends TestCase
         $this->actingAs($ctx['away_captain'], 'sanctum')
             ->postJson('/api/v1/auth/posts/'.$resultId.'/likes', [
                 'action' => 'like',
-                'post_type' => 'regular',
+                'post_type' => 'automatic',
             ])
             ->assertAccepted();
 
         $this->assertDatabaseHas('post_likes', [
             'users_id' => $ctx['away_captain']->id,
             'publication_id' => $resultId,
-            'publication_type' => 'regular',
+            'publication_type' => 'automatic',
         ]);
         $this->assertDatabaseHas('match_results', [
             'id' => $resultId,
@@ -226,21 +226,21 @@ class MatchResultLikeApiTest extends TestCase
         $this->actingAs($liker, 'sanctum')
             ->postJson('/api/v1/auth/posts/'.$resultId.'/likes', [
                 'action' => 'like',
-                'post_type' => 'regular',
+                'post_type' => 'automatic',
             ])
             ->assertAccepted();
 
         $this->actingAs($liker, 'sanctum')
             ->postJson('/api/v1/auth/posts/'.$resultId.'/likes', [
                 'action' => 'dislike',
-                'post_type' => 'regular',
+                'post_type' => 'automatic',
             ])
             ->assertAccepted();
 
         $this->assertDatabaseMissing('post_likes', [
             'users_id' => $liker->id,
             'publication_id' => $resultId,
-            'publication_type' => 'regular',
+            'publication_type' => 'automatic',
         ]);
         $this->assertDatabaseHas('match_results', [
             'id' => $resultId,
@@ -256,7 +256,7 @@ class MatchResultLikeApiTest extends TestCase
         $this->actingAs($ctx['home_captain'], 'sanctum')
             ->postJson('/api/v1/auth/posts/'.$resultId.'/likes', [
                 'action' => 'like',
-                'post_type' => 'regular',
+                'post_type' => 'automatic',
             ])
             ->assertAccepted();
 
@@ -266,5 +266,66 @@ class MatchResultLikeApiTest extends TestCase
             'type' => MatchResultLikeNotification::class,
         ]);
         $this->assertDatabaseCount('notifications', 1);
+    }
+
+    public function test_regular_post_like_notifies_author_only(): void
+    {
+        $author = User::factory()->create();
+        $liker = User::factory()->create();
+        $postId = $this->insertRegularPost($author->id);
+
+        $this->actingAs($liker, 'sanctum')
+            ->postJson('/api/v1/auth/posts/'.$postId.'/likes', [
+                'action' => 'like',
+                'post_type' => 'regular',
+            ])
+            ->assertAccepted();
+
+        $this->assertDatabaseHas('post_likes', [
+            'users_id' => $liker->id,
+            'publication_id' => $postId,
+            'publication_type' => 'regular',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => (string) $author->id,
+            'type' => MatchResultLikeNotification::class,
+        ]);
+        $this->assertDatabaseCount('notifications', 1);
+    }
+
+    public function test_regular_post_self_like_does_not_notify(): void
+    {
+        $author = User::factory()->create();
+        $postId = $this->insertRegularPost($author->id);
+
+        $this->actingAs($author, 'sanctum')
+            ->postJson('/api/v1/auth/posts/'.$postId.'/likes', [
+                'action' => 'like',
+                'post_type' => 'regular',
+            ])
+            ->assertAccepted();
+
+        $this->assertDatabaseCount('notifications', 0);
+    }
+
+    private function insertRegularPost(int $authorId): int
+    {
+        $now = now();
+
+        return (int) DB::table('posts')->insertGetId([
+            'user_id' => $authorId,
+            'body' => 'Publication test',
+            'visibility' => 'public',
+            'status' => 'published',
+            'media_count' => 0,
+            'total_likes' => 0,
+            'total_comments' => 0,
+            'total_shares' => 0,
+            'published_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 }

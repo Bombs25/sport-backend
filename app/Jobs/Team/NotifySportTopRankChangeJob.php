@@ -68,12 +68,12 @@ class NotifySportTopRankChangeJob implements ShouldQueue
         $message = $this->changeType === 'entered_top_3'
             ? "{$this->teamName} vient d'entrer dans le top 3 du classement."
             : "{$this->teamName} vient de sortir du top 3 du classement.";
-        $expoTokens = $recipients
-            ->map(static fn (User $user) => $user->routeNotificationForFcm())
-            ->flatten()
-            ->filter(static fn ($token): bool => is_string($token) && $token !== '')
-            ->values()
-            ->all();
+        $expoTokens = User::expoPushTokensFrom($recipients);
+
+        if ($expoTokens === []) {
+            return;
+        }
+
         $expoPushService->send(
             $expoTokens,
             $this->teamName,

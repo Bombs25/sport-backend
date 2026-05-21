@@ -16,6 +16,7 @@ class PostCommentStoreController extends Controller
         int $post_id,
     ): JsonResponse {
         $validated = $request->validated();
+
         Bus::chain([
             new AddComment(
                 $post_id,

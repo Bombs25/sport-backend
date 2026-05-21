@@ -70,7 +70,7 @@ class CommentLikeNotificationJob implements ShouldQueue
             ->select(['user_id'])
             ->first();
 
-        // Stop when comment no longer exists or when the actor liked their own comment.
+        // Pas de notification si l'auteur like son propre commentaire (le like en base est autorisé).
         if ($comment === null || (int) $comment->user_id === $this->actorUserId) {
             logger()->debug('CommentLikeNotificationJob ended 1');
 
@@ -97,12 +97,11 @@ class CommentLikeNotificationJob implements ShouldQueue
             $actorName,
         ));
 
-        $expoTokens = collect([$recipient])
-            ->map(static fn (User $user) => $user->routeNotificationForFcm())
-            ->flatten()
-            ->filter(static fn ($token): bool => is_string($token) && $token !== '')
-            ->values()
-            ->all();
+        $expoTokens = User::expoPushTokensFrom([$recipient]);
+
+        if ($expoTokens === []) {
+            return;
+        }
 
         $data = [
             'publication_id' => $this->publicationId,

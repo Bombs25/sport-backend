@@ -106,15 +106,6 @@ class RegularPostPublishedNotificationJob implements ShouldQueue
      */
     private function resolveExpoTokens(Collection $users): array
     {
-        return $users
-            ->map(static fn (User $user) => $user->routeNotificationForFcm())
-            ->flatten()
-            ->filter(static function (mixed $token): bool {
-                return is_string($token)
-                    && $token !== ''
-                    && str_starts_with($token, 'ExponentPushToken[');
-            })
-            ->values()
-            ->all();
+        return User::expoPushTokensFrom($users);
     }
 }

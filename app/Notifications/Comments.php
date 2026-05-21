@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\PostPublicationNotificationMessages;
 use Illuminate\Notifications\Notification;
 
 class Comments extends Notification
@@ -65,9 +66,11 @@ class Comments extends Notification
             'content' => $this->content,
             'user_id' => $this->userId,
             'is_response' => $this->isResponse,
-            'message' => ($this->senderName ?? 'Un utilisateur').($this->isResponse
-                ? ' a repondu a un commentaire'
-                : ' a ajoute un nouveau commentaire'),
+            'message' => PostPublicationNotificationMessages::commentMessage(
+                $this->publicationType,
+                $this->senderName,
+                $this->isResponse,
+            ),
         ];
     }
 

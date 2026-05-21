@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 class ResponseCommentLikeService
 {
     /**
-     * @return array{liked: bool, changed: bool, likes_count: int}
+     * @return array{liked: bool, changed: bool, likes_count: int, response_owner_id: int}
      *
      * @throws ValidationException
      */
@@ -97,6 +97,7 @@ class ResponseCommentLikeService
                 'liked' => $liked,
                 'changed' => $changed,
                 'likes_count' => $likesCount,
+                'response_owner_id' => (int) $response->users_id,
             ];
         });
     }

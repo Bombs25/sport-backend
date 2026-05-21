@@ -402,12 +402,11 @@ class ApplyValidatedMatchResultStatsJob implements ShouldQueue
         array $data,
         ExpoPushService $expoPushService,
     ): void {
-        $expoTokens = $users
-            ->map(static fn (User $user) => $user->routeNotificationForFcm())
-            ->flatten()
-            ->filter(static fn ($token): bool => is_string($token) && $token !== '')
-            ->values()
-            ->all();
+        $expoTokens = User::expoPushTokensFrom($users);
+
+        if ($expoTokens === []) {
+            return;
+        }
 
         $expoPushService->send(
             $expoTokens,
