@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class ResponseCommentLikeNotification extends Notification
@@ -29,6 +30,7 @@ class ResponseCommentLikeNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => NotificationType::LIKE_COMMENT_RESPONSE,
             'publication_id' => $this->publicationId,
             'comment_id' => $this->commentId,
             'response_id' => $this->responseId,

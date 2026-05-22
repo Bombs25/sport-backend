@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\V1\Follow\FollowStoreController;
 use App\Http\Controllers\Api\V1\Follow\UserFollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\UserFollowListController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
+use App\Http\Controllers\Api\V1\Notifications\NotificationMarkReadController;
+use App\Http\Controllers\Api\V1\Notifications\NotificationUnreadCountController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
 use App\Http\Controllers\Api\V1\Profile\UserPublicProfileController;
 use App\Http\Controllers\Api\V1\Search\UserNearbySearchController;
@@ -33,6 +35,10 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::patch('profile', UpdateProfileController::class);
     // Notifications en base (10 par page, query `page`).
     Route::get('notifications', NotificationListController::class)->middleware('throttle:auth-follow-read');
+    // Compteur de notifications non lues (badge de l'onglet).
+    Route::get('notifications/unread-count', NotificationUnreadCountController::class)->middleware('throttle:auth-follow-read');
+    // Marque une notification comme lue (au tap côté app).
+    Route::patch('notifications/{notification}/read', NotificationMarkReadController::class)->middleware('throttle:auth-follow-write');
     // S'abonner à un utilisateur (follower → following).
     Route::post('follow', FollowStoreController::class)->middleware('throttle:auth-follow-write');
     // Se désabonner d'un utilisateur.

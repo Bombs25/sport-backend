@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class FollowNotification extends Notification
@@ -27,6 +28,7 @@ class FollowNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => NotificationType::FOLLOW,
             'kind' => $this->kind,
             'actor_user_id' => $this->actorUserId,
             'follow_id' => $this->followId,

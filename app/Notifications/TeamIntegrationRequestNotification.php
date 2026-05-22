@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class TeamIntegrationRequestNotification extends Notification
@@ -26,6 +27,7 @@ class TeamIntegrationRequestNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => NotificationType::TEAM,
             'kind' => 'team_join_request',
             'actor_user_id' => $this->actorUserId,
             'team_id' => $this->teamId,

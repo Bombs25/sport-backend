@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class TeamMatchNotification extends Notification
@@ -29,6 +30,7 @@ class TeamMatchNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => NotificationType::MATCH,
             'kind' => $this->kind,
             'actor_user_id' => $this->actorUserId,
             'match_event_id' => $this->matchEventId,

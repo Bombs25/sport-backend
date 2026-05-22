@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\RegularPostPublishedNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -85,6 +86,7 @@ class RegularPostPublishedNotificationJob implements ShouldQueue
         }
 
         $data = [
+            'notif_type' => NotificationType::POST_PUBLISHED,
             'kind' => 'regular_post_published',
             'actor_user_id' => $this->authorUserId,
             'post_id' => $this->postId,

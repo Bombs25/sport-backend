@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\TeamMemberDestroyNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use App\Support\TeamNotificationRecipients;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -112,6 +113,7 @@ class TeamMemberDestroyNotificationJob implements ShouldQueue
             }
 
             $data = [
+                'notif_type' => NotificationType::TEAM,
                 'kind' => $kind,
                 'actor_user_id' => $this->actorUserId,
                 'team_id' => $this->teamId,

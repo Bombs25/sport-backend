@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class TeamTopRankChangeNotification extends Notification
@@ -33,6 +34,7 @@ class TeamTopRankChangeNotification extends Notification
             : "{$this->teamName} sort du top 3 et passe a la position {$newPosition}.";
 
         return [
+            'notif_type' => NotificationType::TEAM_RANK,
             'type' => 'team_top_rank_change',
             'team_id' => $this->teamId,
             'team_name' => $this->teamName,

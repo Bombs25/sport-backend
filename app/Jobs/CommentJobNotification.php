@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\Comments;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use App\Support\PostPublicationNotificationMessages;
 use App\Support\PostPublicationNotificationRecipients;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -74,6 +75,9 @@ class CommentJobNotification implements ShouldBeEncrypted, ShouldQueue
         }
 
         $data = [
+            'notif_type' => $this->isResponse
+                ? NotificationType::COMMENT_REPLY
+                : NotificationType::COMMENT,
             'publication_id' => $this->publicationId,
             'publication_type' => $this->publicationType,
             'content' => $this->content,

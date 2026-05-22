@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\ResponseCommentLikeNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -86,6 +87,7 @@ class ResponseCommentLikeNotificationJob implements ShouldQueue
         }
 
         $data = [
+            'notif_type' => NotificationType::LIKE_COMMENT_RESPONSE,
             'publication_id' => $this->publicationId,
             'comment_id' => $this->commentId,
             'response_id' => $this->responseId,

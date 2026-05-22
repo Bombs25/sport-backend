@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use App\Support\PostPublicationNotificationMessages;
 use Illuminate\Notifications\Notification;
 
@@ -28,6 +29,7 @@ class MatchResultLikeNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => NotificationType::LIKE_POST,
             'publication_id' => $this->matchResultId,
             'publication_type' => $this->publicationType,
             'user_id' => $this->actorUserId,

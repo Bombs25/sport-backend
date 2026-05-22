@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use App\Support\PostPublicationNotificationMessages;
 use Illuminate\Notifications\Notification;
 
@@ -61,6 +62,9 @@ class Comments extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => $this->isResponse
+                ? NotificationType::COMMENT_REPLY
+                : NotificationType::COMMENT,
             'publication_id' => $this->publicationId,
             'publication_type' => $this->publicationType,
             'content' => $this->content,

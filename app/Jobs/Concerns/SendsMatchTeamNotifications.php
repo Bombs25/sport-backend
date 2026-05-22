@@ -5,6 +5,7 @@ namespace App\Jobs\Concerns;
 use App\Models\User;
 use App\Notifications\TeamMatchNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use App\Support\TeamNotificationRecipients;
 use Illuminate\Support\Facades\Notification;
 
@@ -51,6 +52,7 @@ trait SendsMatchTeamNotifications
                 $message,
                 null,
                 [
+                    'notif_type' => NotificationType::MATCH,
                     'kind' => $kind,
                     'actor_user_id' => $actorUserId,
                     'match_event_id' => $matchEventId,

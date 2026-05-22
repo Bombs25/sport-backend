@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class TeamAverageProgressNotification extends Notification
@@ -31,6 +32,7 @@ class TeamAverageProgressNotification extends Notification
         $rankLabel = $this->currentRank !== null ? (string) $this->currentRank : __('non classe');
 
         return [
+            'notif_type' => NotificationType::TEAM_RANK,
             'type' => 'team_average_progress',
             'team_id' => $this->teamId,
             'team_name' => $this->teamName,

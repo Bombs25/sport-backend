@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\TeamIntegrationDecisionNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -107,6 +108,7 @@ class TeamIntegrationDecisionNotificationJob implements ShouldQueue
         }
 
         $data = [
+            'notif_type' => NotificationType::TEAM,
             'kind' => $kind,
             'actor_user_id' => $this->actorUserId,
             'team_id' => $this->teamId,

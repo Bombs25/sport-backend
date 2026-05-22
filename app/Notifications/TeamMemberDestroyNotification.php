@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Support\NotificationType;
 use Illuminate\Notifications\Notification;
 
 class TeamMemberDestroyNotification extends Notification
@@ -27,6 +28,7 @@ class TeamMemberDestroyNotification extends Notification
     public function toArray(object $notifiable): array
     {
         return [
+            'notif_type' => NotificationType::TEAM,
             'kind' => $this->kind,
             'actor_user_id' => $this->actorUserId,
             'team_id' => $this->teamId,

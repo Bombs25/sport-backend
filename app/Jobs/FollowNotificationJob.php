@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\FollowNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -105,6 +106,7 @@ class FollowNotificationJob implements ShouldQueue
         $expoTokens = [$expoToken];
 
         $data = [
+            'notif_type' => NotificationType::FOLLOW,
             'kind' => $this->kind,
             'actor_user_id' => $this->actorUserId,
             'follow_id' => $this->followId ?? (int) $follow->id,

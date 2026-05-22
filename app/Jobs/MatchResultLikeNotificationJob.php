@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Notifications\MatchResultLikeNotification;
 use App\Services\Notifications\ExpoPushService;
+use App\Support\NotificationType;
 use App\Support\PostPublicationNotificationMessages;
 use App\Support\PostPublicationNotificationRecipients;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -97,6 +98,7 @@ class MatchResultLikeNotificationJob implements ShouldQueue
         }
 
         $data = [
+            'notif_type' => NotificationType::LIKE_POST,
             'publication_id' => $this->matchResultId,
             'publication_type' => $this->publicationType,
             'user_id' => $this->actorUserId,
