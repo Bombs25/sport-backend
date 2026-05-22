@@ -46,6 +46,8 @@ class TeamMatchHistoryApiTest extends TestCase
         int $homeScore,
         int $awayScore,
         CarbonImmutable $validatedAt,
+        int $totalLikes = 0,
+        int $totalComments = 0,
     ): int {
         $matchEventId = (int) DB::table('match_events')->insertGetId([
             'home_team_id' => $homeTeamId,
@@ -64,6 +66,8 @@ class TeamMatchHistoryApiTest extends TestCase
             'match_event_id' => $matchEventId,
             'home_score' => $homeScore,
             'away_score' => $awayScore,
+            'total_likes' => $totalLikes,
+            'total_comments' => $totalComments,
             'status' => 'validated',
             'submitted_by_user_id' => $submitter->id,
             'submitted_at' => $now,
@@ -96,5 +100,73 @@ class TeamMatchHistoryApiTest extends TestCase
         $this->assertSame($older, $matches[1]['match_event_id']);
         $this->assertSame('Hist Away', $matches[0]['away']['name']);
         $this->assertSame(2, $matches[0]['home']['score']);
+    }
+
+    public function test_match_history_exposes_like_and_comment_counts(): void
+    {
+        $sportId = $this->sportIdBySlug('football');
+        $user = User::factory()->create();
+        $home = $this->createTeam(['name' => 'Counts Home', 'sport_id' => $sportId]);
+        $away = $this->createTeam(['name' => 'Counts Away', 'sport_id' => $sportId]);
+
+        $this->insertValidatedMatch(
+            $home,
+            $away,
+            3,
+            1,
+            CarbonImmutable::create(2026, 2, 1, 18, 0),
+            totalLikes: 7,
+            totalComments: 4,
+        );
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/auth/teams/'.$home.'/match-history')
+            ->assertOk();
+
+        $response->assertJsonPath('data.matches.0.total_likes', 7);
+        $response->assertJsonPath('data.matches.0.total_comments', 4);
+    }
+
+    public function test_match_history_is_paginated_ten_per_page(): void
+    {
+        $sportId = $this->sportIdBySlug('football');
+        $user = User::factory()->create();
+        $home = $this->createTeam(['name' => 'Paginated Home', 'sport_id' => $sportId]);
+        $away = $this->createTeam(['name' => 'Paginated Away', 'sport_id' => $sportId]);
+
+        // 13 matchs validés, validated_at croissant -> le plus récent en premier.
+        $eventIds = [];
+        for ($i = 0; $i < 13; $i++) {
+            $eventIds[] = $this->insertValidatedMatch(
+                $home,
+                $away,
+                $i,
+                0,
+                CarbonImmutable::create(2026, 1, 1, 0, 0)->addMinutes($i),
+            );
+        }
+        // Le plus récent d'abord (validated_at DESC).
+        $expectedOrder = array_reverse($eventIds);
+
+        $page1 = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/auth/teams/'.$home.'/match-history?page=1')
+            ->assertOk();
+
+        $page1->assertJsonCount(10, 'data.matches')
+            ->assertJsonPath('data.meta.current_page', 1)
+            ->assertJsonPath('data.meta.per_page', 10)
+            ->assertJsonPath('data.meta.total', 13)
+            ->assertJsonPath('data.meta.last_page', 2)
+            ->assertJsonPath('data.meta.has_more', true)
+            ->assertJsonPath('data.matches.0.match_event_id', $expectedOrder[0]);
+
+        $page2 = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/auth/teams/'.$home.'/match-history?page=2')
+            ->assertOk();
+
+        $page2->assertJsonCount(3, 'data.matches')
+            ->assertJsonPath('data.meta.current_page', 2)
+            ->assertJsonPath('data.meta.has_more', false)
+            ->assertJsonPath('data.matches.0.match_event_id', $expectedOrder[10]);
     }
 }

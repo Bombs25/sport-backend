@@ -5,7 +5,8 @@ namespace App\Http\Requests\Api\V1\Teams;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Ce qu'il fait : valide `team_id` sur la route pour le dernier match validé.
+ * Ce qu'il fait : valide `team_id` (route) et `page` (query, optionnel) pour le
+ * dernier match validé et l'historique paginé des matchs.
  */
 class TeamLatestMatchRequest extends FormRequest
 {
@@ -18,6 +19,7 @@ class TeamLatestMatchRequest extends FormRequest
     {
         $this->merge([
             'team_id' => $this->route('team_id'),
+            'page' => $this->query('page', 1),
         ]);
     }
 
@@ -28,6 +30,7 @@ class TeamLatestMatchRequest extends FormRequest
     {
         return [
             'team_id' => ['required', 'integer', 'exists:teams,id'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

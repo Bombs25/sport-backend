@@ -9,6 +9,7 @@
 | GET `/api/v1/auth/posts/regular/feed` — même format de query `viewed_post_ids`, mais validé contre `posts.id`.
 */
 
+use App\Http\Controllers\Api\V1\Posts\MatchResultShowController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentDestroyController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentLikeToggleController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentResponseDestroyController;
@@ -28,6 +29,10 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('posts/feed', FetchGamePost::class)
         ->middleware('throttle:60,1')
         ->name('api.v1.auth.posts.feed');
+    Route::get('posts/feed/{match_result_id}', MatchResultShowController::class)
+        ->whereNumber('match_result_id')
+        ->middleware('throttle:60,1')
+        ->name('api.v1.auth.posts.match-result.show');
     Route::get('posts/regular/feed', RegularPostFeedController::class)
         ->middleware('throttle:60,1')
         ->name('api.v1.auth.posts.regular.feed');

@@ -529,6 +529,68 @@ class FetchPostService
     }
 
     /**
+     * Un post « automatic » (résultat de match validé) par id, pour l'écran détail.
+     * Réutilise la forme de requête du fil match. Un post automatic n'a pas de ligne
+     * `posts` : il EST un `match_results` validé, et son id sert de `publication_id`
+     * pour les commentaires / likes (`publication_type = 'automatic'`).
+     * Renvoie `null` si le résultat n'existe pas ou n'est pas `validated` (le
+     * contrôleur traduit en 404).
+     */
+    public function fetchMatchResultById(int $viewerUserId, int $matchResultId): ?object
+    {
+        $viewerLikesSub = DB::table('post_likes')
+            ->select('publication_id')
+            ->where('users_id', $viewerUserId)
+            ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
+
+        $row = DB::table('match_results')
+            ->join('match_events', 'match_events.id', '=', 'match_results.match_event_id')
+            ->join('teams as home_teams', 'home_teams.id', '=', 'match_events.home_team_id')
+            ->join('teams as away_teams', 'away_teams.id', '=', 'match_events.away_team_id')
+            ->leftJoinSub($viewerLikesSub, 'viewer_match_likes', function ($join): void {
+                $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
+            })
+            ->where('match_results.id', $matchResultId)
+            ->where('match_results.status', self::MATCH_RESULT_FEED_STATUS)
+            ->select([
+                'match_results.id',
+                'match_results.match_event_id',
+                'match_results.status',
+                'match_results.home_score',
+                'match_results.away_score',
+                'match_results.total_comments',
+                'match_results.total_likes',
+                'match_results.submitted_by_user_id',
+                'match_results.submitted_at',
+                'match_results.validated_at',
+                'match_results.created_at',
+                'match_results.updated_at',
+                'match_events.scheduled_at',
+                'match_events.venue',
+                'match_events.status as match_event_status',
+                'home_teams.id as home_team_id',
+                'home_teams.name as home_team_name',
+                'home_teams.logo_url as home_team_logo_url',
+                'away_teams.id as away_team_id',
+                'away_teams.name as away_team_name',
+                'away_teams.logo_url as away_team_logo_url',
+                DB::raw("'detail' AS tag"),
+            ])
+            ->addSelect(DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'))
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+        $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
+        $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
+
+        return $row;
+    }
+
+    /**
      * @param  array<int, int>  $viewedIds
      * @param  array<int, int>  $excludedPostIds
      * @return Collection<int, object>

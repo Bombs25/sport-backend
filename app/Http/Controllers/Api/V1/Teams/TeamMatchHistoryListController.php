@@ -15,12 +15,15 @@ class TeamMatchHistoryListController extends Controller
     public function __invoke(TeamLatestMatchRequest $request, TeamMatchReadRepository $matches): JsonResponse
     {
         $teamId = (int) $request->validated('team_id');
-        $rawMatches = $matches->listValidatedMatchesForTeam($teamId);
+        $page = (int) ($request->validated('page') ?? 1);
+        $result = $matches->listValidatedMatchesForTeam($teamId, $page);
 
         $items = array_map(
             static fn (array $raw): array => [
                 'match_event_id' => $raw['match_event_id'],
                 'match_result_id' => $raw['match_result_id'],
+                'total_likes' => $raw['total_likes'],
+                'total_comments' => $raw['total_comments'],
                 'validated_at' => $raw['validated_at'],
                 'scheduled_at' => $raw['scheduled_at'],
                 'venue' => $raw['venue'],
@@ -37,12 +40,13 @@ class TeamMatchHistoryListController extends Controller
                     'score' => $raw['away_score'],
                 ],
             ],
-            $rawMatches,
+            $result['matches'],
         );
 
         return response()->json([
             'data' => [
                 'matches' => $items,
+                'meta' => $result['meta'],
             ],
         ]);
     }
