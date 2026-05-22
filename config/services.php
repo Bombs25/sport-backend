@@ -43,4 +43,11 @@ return [
         'sync_enabled' => env('TYPESENSE_SYNC_ENABLED', true),
     ],
 
+    'sendbird' => [
+        // App ID public (aussi exposé à l'app mobile). Le token reste serveur uniquement.
+        'app_id' => env('SENDBIRD_APP_ID'),
+        'api_token' => env('SENDBIRD_API_TOKEN'),
+        'base_url' => env('SENDBIRD_API_BASE_URL'),
+    ],
+
 ];

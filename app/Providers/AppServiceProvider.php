@@ -12,6 +12,7 @@ use App\Listeners\ImageProcessingListener;
 use App\Repositories\Stats\QueryBuilderStatsRepository;
 use App\Repositories\Teams\QueryBuilderTeamMatchReadRepository;
 use App\Services\Files\ImageProcessing;
+use App\Services\Sendbird\SendbirdService;
 use App\Services\Stats\AnnualSeasonStrategy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Events\DatabaseRefreshed;
@@ -56,6 +57,17 @@ class AppServiceProvider extends ServiceProvider
             ]);
 
             return $client;
+        });
+
+        // Sendbird : provisionnement utilisateur + tokens de session (Platform API).
+        $this->app->singleton(SendbirdService::class, function () {
+            $config = config('services.sendbird');
+
+            return new SendbirdService(
+                appId: $config['app_id'] ?? null,
+                apiToken: $config['api_token'] ?? null,
+                baseUrl: $config['base_url'] ?? null,
+            );
         });
     }
 
@@ -147,6 +159,12 @@ class AppServiceProvider extends ServiceProvider
             $id = (string) ($request->user()?->id ?? 'guest');
 
             return Limit::perMinute(30)->by($id.'|'.$request->ip());
+        });
+
+        RateLimiter::for('auth-sendbird', function (Request $request) {
+            $id = (string) ($request->user()?->id ?? 'guest');
+
+            return Limit::perMinute(20)->by($id.'|'.$request->ip());
         });
 
         RateLimiter::for('auth-forgot-password', function (Request $request) {
