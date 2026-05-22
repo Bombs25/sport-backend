@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\Posts\PostCommentStoreController;
 use App\Http\Controllers\Api\V1\Posts\PostMatchResultLikeToggleController;
 use App\Http\Controllers\Api\V1\Posts\PostStoreController;
 use App\Http\Controllers\Api\V1\Posts\RegularPostFeedController;
+use App\Http\Controllers\Api\V1\Posts\RegularPostShowController;
 use App\Http\Controllers\FetchGamePost;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,10 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('posts/regular/feed', RegularPostFeedController::class)
         ->middleware('throttle:60,1')
         ->name('api.v1.auth.posts.regular.feed');
+    Route::get('posts/regular/{post_id}', RegularPostShowController::class)
+        ->whereNumber('post_id')
+        ->middleware('throttle:60,1')
+        ->name('api.v1.auth.posts.regular.show');
     Route::post('posts', PostStoreController::class)
         ->middleware('throttle:30,1')
         ->name('api.v1.auth.posts.store');

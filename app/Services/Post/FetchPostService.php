@@ -463,6 +463,72 @@ class FetchPostService
     }
 
     /**
+     * Posts réguliers publiés par un utilisateur donné (grille du profil public).
+     * Réutilise la requête de base du fil ; les posts en visibilité `followers` ne
+     * sont inclus que si l'observateur suit l'auteur (ou est l'auteur lui-même).
+     *
+     * @return Collection<int, object>
+     */
+    public function fetchRegularPostsByAuthor(
+        int $viewerUserId,
+        int $authorUserId,
+        bool $includeFollowersVisibility,
+        int $limit,
+    ): Collection {
+        $query = $this->regularPostBaseQuery($viewerUserId)
+            ->where('posts.user_id', $authorUserId)
+            ->whereIn('posts.visibility', $includeFollowersVisibility ? ['public', 'followers'] : ['public'])
+            ->addSelect(DB::raw("'profile' AS tag"));
+
+        return $this->attachMediaToRegularPosts(
+            $query
+                ->orderByDesc('posts.published_at')
+                ->orderByDesc('posts.id')
+                ->limit($limit)
+                ->get()
+        );
+    }
+
+    /**
+     * Un post régulier publié, par id, visible pour l'observateur (écran détail).
+     * Réutilise la requête de base du fil ; les posts en visibilité `followers` ne
+     * sont renvoyés que si l'observateur suit l'auteur (ou est l'auteur lui-même).
+     * Renvoie `null` si le post n'existe pas, n'est pas publié, est supprimé, ou si
+     * sa visibilité l'interdit à l'observateur (le contrôleur traduit en 404).
+     */
+    public function fetchRegularPostById(int $viewerUserId, int $postId): ?object
+    {
+        $meta = DB::table('posts')
+            ->where('id', $postId)
+            ->where('status', 'published')
+            ->whereNull('deleted_at')
+            ->first(['user_id', 'visibility']);
+
+        if ($meta === null) {
+            return null;
+        }
+
+        $includeFollowers = $viewerUserId === (int) $meta->user_id
+            || DB::table('follows')
+                ->where('follower_id', $viewerUserId)
+                ->where('following_id', $meta->user_id)
+                ->where('status', 'accepted')
+                ->exists();
+
+        $row = $this->regularPostBaseQuery($viewerUserId)
+            ->where('posts.id', $postId)
+            ->whereIn('posts.visibility', $includeFollowers ? ['public', 'followers'] : ['public'])
+            ->addSelect(DB::raw("'detail' AS tag"))
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return $this->attachMediaToRegularPosts(collect([$row]))->first();
+    }
+
+    /**
      * @param  array<int, int>  $viewedIds
      * @param  array<int, int>  $excludedPostIds
      * @return Collection<int, object>

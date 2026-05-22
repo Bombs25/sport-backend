@@ -135,4 +135,53 @@ class UserPublicProfileTest extends TestCase
             ->assertJsonPath('user.am_i_following', false)
             ->assertJsonPath('user.target_follows_me', true);
     }
+
+    public function test_public_profile_includes_author_published_regular_posts(): void
+    {
+        $viewer = User::factory()->create();
+        $target = User::factory()->create();
+        $token = $viewer->createToken('auth')->plainTextToken;
+
+        DB::table('user_profiles')->insert(array_merge([
+            'user_id' => $target->id,
+            'display_name' => 'Cible Posts',
+            'handle' => 'cible_posts',
+            'bio' => null,
+            'avatar_url' => null,
+            'is_private' => false,
+            'city' => null,
+            'address_line' => null,
+            'birth_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
+
+        $publicPostId = DB::table('posts')->insertGetId([
+            'user_id' => $target->id,
+            'body' => 'Post public de la cible',
+            'visibility' => 'public',
+            'status' => 'published',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Post `followers`-only : doit être exclu pour un observateur qui ne suit pas la cible.
+        DB::table('posts')->insertGetId([
+            'user_id' => $target->id,
+            'body' => 'Post réservé aux abonnés',
+            'visibility' => 'followers',
+            'status' => 'published',
+            'published_at' => now()->copy()->subMinute(),
+            'created_at' => now()->copy()->subMinute(),
+            'updated_at' => now()->copy()->subMinute(),
+        ]);
+
+        $this->getJson('/api/v1/auth/users/'.$target->id.'/profile', [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk()
+            ->assertJsonCount(1, 'posts')
+            ->assertJsonPath('posts.0.id', (int) $publicPostId)
+            ->assertJsonPath('posts.0.user_id', $target->id);
+    }
 }
