@@ -21,6 +21,79 @@ class DemoRegularPostsSeeder extends Seeder
         'Objectif régularité : une séance de plus dans les jambes.',
     ];
 
+    /**
+     * URLs Unsplash stables (CDN `images.unsplash.com`) regroupées par slug sport.
+     * On n'utilise PAS `source.unsplash.com` : service déprécié par Unsplash en 2024.
+     *
+     * @var array<string, list<string>>
+     */
+    private const UNSPLASH_BY_SPORT = [
+        'football' => [
+            'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1486286701208-1d58e9338013?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?w=1080&q=80&auto=format',
+        ],
+        'basketball' => [
+            'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1518614846040-6c711dbcb8e0?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1505666287802-931dc83a0fe4?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1504450758481-7338eba7524a?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1577471488278-16eec37ffcc2?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1608245449230-4ac19066d2d0?w=1080&q=80&auto=format',
+        ],
+        'tennis' => [
+            'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1530915534935-d013d0e75f5b?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1542144582-1ba00456b5e3?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1622279488611-2c44e9d80bff?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1599586120429-48eb5d4c5f1f?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1531315396756-905d68d21b56?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=1080&q=80&auto=format',
+        ],
+        'running' => [
+            'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1486218119243-13883505764c?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1502904550040-7534597429ae?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1466150036782-869a824aeb25?w=1080&q=80&auto=format',
+            'https://images.unsplash.com/photo-1490137462308-de9582f6c11a?w=1080&q=80&auto=format',
+        ],
+    ];
+
+    /**
+     * Pool de secours pour les sports hors liste (yoga, padel) ou les users
+     * sans `user_sports`.
+     *
+     * @var list<string>
+     */
+    private const UNSPLASH_FALLBACK = [
+        'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1530549387789-4c1017266635?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1593079831268-3381b0db4a77?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1517438476312-10d79c077509?w=1080&q=80&auto=format',
+        'https://images.unsplash.com/photo-1599058917212-d750089bc07e?w=1080&q=80&auto=format',
+    ];
+
+    /**
+     * Cache `user_id => slug sport` pour éviter une jointure par chunk.
+     *
+     * @var array<int, string>
+     */
+    private array $sportByUserId = [];
+
     public function run(): void
     {
         if (! DB::getSchemaBuilder()->hasTable('posts') || ! DB::getSchemaBuilder()->hasTable('post_media')) {
@@ -50,6 +123,8 @@ class DemoRegularPostsSeeder extends Seeder
 
             return;
         }
+
+        $this->sportByUserId = $this->loadSportByUserId($userIds);
 
         $now = now();
         $created = 0;
@@ -115,28 +190,40 @@ class DemoRegularPostsSeeder extends Seeder
             throw new \RuntimeException('DemoRegularPostsSeeder : nombre de posts inséré incohérent.');
         }
 
-        $this->insertMediaForPosts($postIds, $variantBase, $now);
+        $userByPostId = [];
+        foreach ($postIds as $offset => $postId) {
+            $userByPostId[$postId] = (int) $rows[$offset]['user_id'];
+        }
+
+        $this->insertMediaForPosts($postIds, $userByPostId, $variantBase, $now);
         $this->insertInteractionsForPosts($postIds, $userIds, $variantBase, $now);
     }
 
     /**
+     * Insère les médias d'un chunk de posts en piochant une URL Unsplash dans
+     * le pool correspondant au **sport favori de l'auteur** (slug `football`,
+     * `basketball`, `tennis`, `running`) ; sinon dans le pool de secours.
+     *
      * @param  array<int, int>  $postIds
+     * @param  array<int, int>  $userByPostId  Map `post_id => user_id`.
      */
-    private function insertMediaForPosts(array $postIds, int $variantBase, CarbonInterface $now): void
+    private function insertMediaForPosts(array $postIds, array $userByPostId, int $variantBase, CarbonInterface $now): void
     {
         $rows = [];
 
         foreach ($postIds as $offset => $postId) {
             $i = $variantBase + $offset;
             $mediaCount = $i % 4;
+            $pool = $this->poolForUser($userByPostId[$postId] ?? 0);
+            $poolSize = count($pool);
 
             for ($position = 0; $position < $mediaCount; $position++) {
                 $rows[] = [
                     'post_id' => $postId,
                     'position' => $position,
-                    'path' => 'temps/demo-posts/post-'.$postId.'-'.($position + 1).'.webp',
-                    'blurhash' => 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
-                    'alt_text' => 'Image démo du post '.$postId.' #'.($position + 1),
+                    'path' => $pool[($i + $position) % $poolSize],
+                    'blurhash' => null,
+                    'alt_text' => 'Photo sport démo Unsplash',
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -146,6 +233,40 @@ class DemoRegularPostsSeeder extends Seeder
         if ($rows !== []) {
             DB::table('post_media')->insert($rows);
         }
+    }
+
+    /**
+     * Pré-charge `user_id => slug du sport favori` (ou premier rattaché à défaut)
+     * en une seule requête Query Builder (§1.7 schéma O'Sport).
+     *
+     * @param  array<int, int>  $userIds
+     * @return array<int, string>
+     */
+    private function loadSportByUserId(array $userIds): array
+    {
+        if ($userIds === [] || ! DB::getSchemaBuilder()->hasTable('user_sports')) {
+            return [];
+        }
+
+        return DB::table('user_sports')
+            ->join('sports', 'sports.id', '=', 'user_sports.sport_id')
+            ->whereIn('user_sports.user_id', $userIds)
+            ->orderByDesc('user_sports.is_favorite')
+            ->orderBy('user_sports.id')
+            ->get(['user_sports.user_id', 'sports.slug'])
+            ->groupBy('user_id')
+            ->map(static fn ($rows): string => (string) $rows->first()->slug)
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function poolForUser(int $userId): array
+    {
+        $slug = $this->sportByUserId[$userId] ?? null;
+
+        return self::UNSPLASH_BY_SPORT[$slug] ?? self::UNSPLASH_FALLBACK;
     }
 
     /**
