@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Services\Messages\MessageableUserFilterService;
 use App\Support\PublicImageUrl;
 use App\Support\Search\TypesenseSyncGuard;
 use App\Support\Search\TypesenseUsersCollectionSchema;
@@ -268,6 +269,59 @@ class TypesenseUserService
                 DB::raw('CASE WHEN user_profiles.`location` IS NULL THEN NULL ELSE ST_Latitude(user_profiles.`location`) END AS `latitude`'),
                 DB::raw('CASE WHEN user_profiles.`location` IS NULL THEN NULL ELSE ST_Longitude(user_profiles.`location`) END AS `longitude`'),
             ]);
+    }
+
+    /**
+     * Recherche tous les profils publics (sans géoloc) — utilisé par le
+     * picker « partager à » où ce qui compte est le nom/handle, pas la
+     * distance. Le filtre `who_can_message_me` est appliqué ailleurs
+     * ({@see MessageableUserFilterService}) parce
+     * que Typesense ne stocke pas ce champ.
+     *
+     * @return array{
+     *     data: list<array<string, mixed>>,
+     *     meta: array<string, mixed>
+     * }
+     *
+     * @throws TypesenseClientError
+     */
+    public function searchPublicUsersForDm(
+        string $query = '*',
+        int $page = 1,
+        int $perPage = 20,
+        ?int $excludeUserId = null,
+    ): array {
+        $q = trim($query) !== '' ? trim($query) : '*';
+        $filters = ['is_private:=false'];
+
+        if ($excludeUserId !== null) {
+            $filters[] = 'id:!='.$excludeUserId;
+        }
+
+        $response = $this->client->collections['users']->documents->search([
+            'q' => $q,
+            'query_by' => 'name,display_name,handle,bio,city',
+            'filter_by' => implode(' && ', $filters),
+            'sort_by' => '_text_match:desc',
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+
+        $found = (int) ($response['found'] ?? 0);
+        $currentPage = (int) ($response['page'] ?? $page);
+        $nextPage = $currentPage * $perPage < $found ? $currentPage + 1 : null;
+
+        return [
+            'data' => $this->formatSearchHits($response['hits'] ?? []),
+            'meta' => [
+                'found' => $found,
+                'out_of' => (int) ($response['out_of'] ?? 0),
+                'page' => $currentPage,
+                'next_page' => $nextPage,
+                'per_page' => $perPage,
+                'search_time_ms' => (int) ($response['search_time_ms'] ?? 0),
+            ],
+        ];
     }
 
     /**

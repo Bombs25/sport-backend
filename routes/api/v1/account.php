@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Account\BlockedUserListController;
 use App\Http\Controllers\Api\V1\Account\BlockedUserStoreController;
 use App\Http\Controllers\Api\V1\Account\NotificationPreferencesShowController;
 use App\Http\Controllers\Api\V1\Account\NotificationPreferencesUpdateController;
+use App\Http\Controllers\Api\V1\Account\ReportStoreController;
 use App\Http\Controllers\Api\V1\Account\UpdatePushTokenController;
 use App\Http\Controllers\Api\V1\Follow\FollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\FollowDestroyController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\V1\Follow\FollowRequestRejectController;
 use App\Http\Controllers\Api\V1\Follow\FollowStoreController;
 use App\Http\Controllers\Api\V1\Follow\UserFollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\UserFollowListController;
+use App\Http\Controllers\Api\V1\Messages\MessageableUsersSearchController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationListController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationMarkReadController;
 use App\Http\Controllers\Api\V1\Notifications\NotificationUnreadCountController;
@@ -59,6 +61,9 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::post('follow-requests/reject', FollowRequestRejectController::class)->middleware('throttle:auth-follow-write');
     // Recherche de profils publics autour de la localisation du profil connecté.
     Route::get('users/search', UserNearbySearchController::class)->middleware('throttle:auth-follow-read');
+    // Recherche pour le picker « partager à » : applique le filtre `who_can_message_me`.
+    Route::get('messageable-users', MessageableUsersSearchController::class)
+        ->middleware('throttle:auth-follow-read');
     // Profil public d'un utilisateur (id) : e-mail masqué sauf soi-même ; comptes privés si non autorisé.
     Route::get('users/{user}/profile', UserPublicProfileController::class)->middleware('throttle:auth-follow-read');
     // Totaux posts / followers / following d'un utilisateur (mêmes règles d'accès que le profil public).
@@ -76,6 +81,8 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::delete('blocked-users/{blockedUserId}', BlockedUserDestroyController::class)
         ->whereNumber('blockedUserId')
         ->middleware('throttle:auth-follow-write');
+    // Signaler un utilisateur (ActionSheet > Signaler sur un profil).
+    Route::post('reports', ReportStoreController::class)->middleware('throttle:auth-follow-write');
     // Contact support (Paramètres > Centre d'aide). Throttle générique en write.
     Route::post('support/contact', SupportContactController::class)
         ->middleware('throttle:auth-follow-write');

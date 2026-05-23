@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Posts\PostCommentResponsesListController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentResponseStoreController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentsListController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentStoreController;
+use App\Http\Controllers\Api\V1\Posts\PostDestroyController;
 use App\Http\Controllers\Api\V1\Posts\PostMatchResultLikeToggleController;
 use App\Http\Controllers\Api\V1\Posts\PostStoreController;
 use App\Http\Controllers\Api\V1\Posts\RegularPostFeedController;
@@ -43,6 +44,11 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::post('posts', PostStoreController::class)
         ->middleware('throttle:30,1')
         ->name('api.v1.auth.posts.store');
+    // Supprime un post régulier (menu ⋮, auteur uniquement). Soft-delete.
+    Route::delete('posts/{post_id}', PostDestroyController::class)
+        ->whereNumber('post_id')
+        ->middleware('throttle:30,1')
+        ->name('api.v1.auth.posts.destroy');
     Route::post('posts/{post_id}/likes', PostMatchResultLikeToggleController::class);
     Route::post('posts/{post_id}/comments', PostCommentStoreController::class);
     Route::get('posts/comments', PostCommentsListController::class);
