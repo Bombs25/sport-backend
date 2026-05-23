@@ -115,4 +115,10 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+     * Destinataire des messages envoyés depuis l'app
+     * (Paramètres > Centre d'aide > Contacter le support).
+     */
+    'support_to' => env('MAIL_SUPPORT_TO', env('MAIL_FROM_ADDRESS', 'support@example.com')),
+
 ];

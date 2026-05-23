@@ -1,5 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Account\BlockedUserDestroyController;
+use App\Http\Controllers\Api\V1\Account\BlockedUserListController;
+use App\Http\Controllers\Api\V1\Account\BlockedUserStoreController;
+use App\Http\Controllers\Api\V1\Account\NotificationPreferencesShowController;
+use App\Http\Controllers\Api\V1\Account\NotificationPreferencesUpdateController;
 use App\Http\Controllers\Api\V1\Account\UpdatePushTokenController;
 use App\Http\Controllers\Api\V1\Follow\FollowCountsController;
 use App\Http\Controllers\Api\V1\Follow\FollowDestroyController;
@@ -16,6 +21,7 @@ use App\Http\Controllers\Api\V1\Notifications\NotificationUnreadCountController;
 use App\Http\Controllers\Api\V1\Profile\UpdateProfileController;
 use App\Http\Controllers\Api\V1\Profile\UserPublicProfileController;
 use App\Http\Controllers\Api\V1\Search\UserNearbySearchController;
+use App\Http\Controllers\Api\V1\Support\SupportContactController;
 use App\Http\Controllers\Api\V1\Upload\UploadProgressPollController;
 use App\Http\Controllers\Api\V1\Users\CurrentUserController;
 use Illuminate\Support\Facades\Route;
@@ -59,4 +65,18 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     Route::get('users/{user}/follows/counts', UserFollowCountsController::class)->middleware('throttle:auth-follow-read');
     // Liste followers ou following d'un utilisateur (e-mail masqué ; mêmes règles d'accès que le profil public).
     Route::get('users/{user}/follows', UserFollowListController::class)->middleware('throttle:auth-follow-read');
+    // Préférences notifications (Paramètres > Notifications) : show / update partiel.
+    Route::get('notification-preferences', NotificationPreferencesShowController::class)
+        ->middleware('throttle:auth-follow-read');
+    Route::patch('notification-preferences', NotificationPreferencesUpdateController::class)
+        ->middleware('throttle:auth-follow-write');
+    // Comptes bloqués (Paramètres > Confidentialité) : bloquer, lister, débloquer.
+    Route::post('blocked-users', BlockedUserStoreController::class)->middleware('throttle:auth-follow-write');
+    Route::get('blocked-users', BlockedUserListController::class)->middleware('throttle:auth-follow-read');
+    Route::delete('blocked-users/{blockedUserId}', BlockedUserDestroyController::class)
+        ->whereNumber('blockedUserId')
+        ->middleware('throttle:auth-follow-write');
+    // Contact support (Paramètres > Centre d'aide). Throttle générique en write.
+    Route::post('support/contact', SupportContactController::class)
+        ->middleware('throttle:auth-follow-write');
 });

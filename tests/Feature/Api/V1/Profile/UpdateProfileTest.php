@@ -104,4 +104,65 @@ class UpdateProfileTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['handle']);
     }
+
+    public function test_update_profile_accepts_phone_and_returns_it_in_payload(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('auth')->plainTextToken;
+
+        DB::table('user_profiles')->insert(array_merge([
+            'user_id' => $user->id,
+            'display_name' => 'User Phone',
+            'handle' => 'user_phone',
+            'bio' => null,
+            'phone' => null,
+            'avatar_url' => null,
+            'is_private' => false,
+            'city' => null,
+            'address_line' => null,
+            'birth_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
+
+        $this->patchJson('/api/v1/auth/profile', [
+            'phone' => '+33 6 12 34 56 78',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk()
+            ->assertJsonPath('user.profile.phone', '+33 6 12 34 56 78');
+
+        $this->assertSame(
+            '+33 6 12 34 56 78',
+            DB::table('user_profiles')->where('user_id', $user->id)->value('phone'),
+        );
+    }
+
+    public function test_update_profile_rejects_invalid_phone_format(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('auth')->plainTextToken;
+
+        DB::table('user_profiles')->insert(array_merge([
+            'user_id' => $user->id,
+            'display_name' => 'User Phone Invalid',
+            'handle' => 'user_phone_invalid',
+            'bio' => null,
+            'phone' => null,
+            'avatar_url' => null,
+            'is_private' => false,
+            'city' => null,
+            'address_line' => null,
+            'birth_date' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], UserProfileLocation::columnsFromLatLng(null, null)));
+
+        $this->patchJson('/api/v1/auth/profile', [
+            'phone' => 'abc;drop table',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['phone']);
+    }
 }

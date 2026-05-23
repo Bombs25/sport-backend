@@ -3,9 +3,9 @@
 namespace App\Services\Profile;
 
 use App\Services\Search\Concerns\SyncsUserToTypesense;
-use App\Support\Search\TypesenseSyncGuard;
 use App\Services\Search\TypesenseTeamService;
 use App\Services\Search\TypesenseUserService;
+use App\Support\Search\TypesenseSyncGuard;
 use App\Support\UserProfileLocation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -63,8 +63,36 @@ class UpdateProfileService
             $profileUpdates['bio'] = $validated['bio'];
         }
 
+        if (array_key_exists('phone', $validated)) {
+            $profileUpdates['phone'] = $validated['phone'];
+        }
+
         if (array_key_exists('is_private', $validated)) {
             $profileUpdates['is_private'] = (bool) $validated['is_private'];
+        }
+
+        if (array_key_exists('who_can_tag_me', $validated)) {
+            $profileUpdates['who_can_tag_me'] = $validated['who_can_tag_me'];
+        }
+
+        if (array_key_exists('who_can_message_me', $validated)) {
+            $profileUpdates['who_can_message_me'] = $validated['who_can_message_me'];
+        }
+
+        if (array_key_exists('precise_location_enabled', $validated)) {
+            $profileUpdates['precise_location_enabled'] = (bool) $validated['precise_location_enabled'];
+        }
+
+        if (array_key_exists('hide_online_status', $validated)) {
+            $profileUpdates['hide_online_status'] = (bool) $validated['hide_online_status'];
+        }
+
+        if (array_key_exists('language', $validated)) {
+            $profileUpdates['language'] = $validated['language'];
+        }
+
+        if (array_key_exists('theme', $validated)) {
+            $profileUpdates['theme'] = $validated['theme'];
         }
 
         if (array_key_exists('avatar_url', $validated)) {

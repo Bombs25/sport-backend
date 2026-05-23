@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\User;
 use App\Notifications\FollowNotification;
+use App\Services\Account\NotificationPreferencesService;
 use App\Services\Notifications\ExpoPushService;
 use App\Support\NotificationType;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -100,6 +101,13 @@ class FollowNotificationJob implements ShouldQueue
         $expoToken = $recipient->routeNotificationForFcm();
 
         if ($expoToken === null) {
+            return;
+        }
+
+        // Respecte les préférences de l'utilisateur destinataire (cf. service).
+        // La notif in-app (database) part toujours ; seul le push est filtré.
+        $prefs = app(NotificationPreferencesService::class);
+        if (! $prefs->shouldSend($this->recipientUserId, 'social', 'follow', 'push')) {
             return;
         }
 
