@@ -18,9 +18,9 @@ class PostStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['nullable', 'string', 'max:5000', 'required_without:media'],
+            'body' => ['nullable', 'string', 'max:5000'],
             'visibility' => ['sometimes', 'string', 'in:public,followers'],
-            'media' => ['nullable', 'array', 'max:3', 'required_without:body'],
+            'media' => ['required', 'array', 'min:1', 'max:3'],
             'media.*' => ['file', new RasterImageFile],
         ];
     }
@@ -31,6 +31,9 @@ class PostStoreRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'media.required' => 'Au moins une photo est requise.',
+            'media.min' => 'Au moins une photo est requise.',
+            'media.max' => 'Tu ne peux pas envoyer plus de 3 photos.',
             'media.*.uploaded' => 'La photo n’a pas pu être envoyée.',
             'media.*.file' => 'Chaque photo doit être un fichier image valide.',
         ];

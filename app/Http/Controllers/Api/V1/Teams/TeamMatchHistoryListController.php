@@ -24,6 +24,9 @@ class TeamMatchHistoryListController extends Controller
                 'match_result_id' => $raw['match_result_id'],
                 'total_likes' => $raw['total_likes'],
                 'total_comments' => $raw['total_comments'],
+                // Auteur du résultat — exposé pour permettre l'ouverture
+                // contextuelle du menu ⋮ côté app (Signaler/Bloquer/...).
+                'submitted_by_user_id' => $raw['submitted_by_user_id'],
                 'validated_at' => $raw['validated_at'],
                 'scheduled_at' => $raw['scheduled_at'],
                 'venue' => $raw['venue'],

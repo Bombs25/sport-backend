@@ -7,9 +7,11 @@ use App\Models\User;
 use App\Notifications\RegularPostPublishedNotification;
 use App\Services\Notifications\ExpoPushService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class RegularPostPublishedNotificationTest extends TestCase
@@ -19,6 +21,7 @@ class RegularPostPublishedNotificationTest extends TestCase
     public function test_post_store_dispatches_notification_job(): void
     {
         Queue::fake();
+        Storage::fake('public');
 
         $author = User::factory()->create(['name' => 'Auteur Test']);
         $token = $author->createToken('auth')->plainTextToken;
@@ -26,6 +29,7 @@ class RegularPostPublishedNotificationTest extends TestCase
         $this->postJson('/api/v1/auth/posts', [
             'body' => 'Mon premier post',
             'visibility' => 'public',
+            'media' => [UploadedFile::fake()->image('p.jpg')],
         ], [
             'Authorization' => 'Bearer '.$token,
         ])->assertCreated();

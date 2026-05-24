@@ -57,12 +57,17 @@ class FetchPostService
             ->where('users_id', $viewerUserId)
             ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
 
+        $viewerSavesSub = $this->viewerMatchSavesSubQuery($viewerUserId);
+
         $query = DB::table('match_results')
             ->join('match_events', 'match_events.id', '=', 'match_results.match_event_id')
             ->join('teams as home_teams', 'home_teams.id', '=', 'match_events.home_team_id')
             ->join('teams as away_teams', 'away_teams.id', '=', 'match_events.away_team_id')
             ->leftJoinSub($viewerLikesSub, 'viewer_match_likes', function ($join): void {
                 $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
+            })
+            ->leftJoinSub($viewerSavesSub, 'viewer_match_saves', function ($join): void {
+                $join->on('viewer_match_saves.publication_id', '=', 'match_results.id');
             })
             ->whereIn('match_results.submitted_by_user_id', $followingIds)
             ->where('match_results.status', self::MATCH_RESULT_FEED_STATUS)
@@ -93,7 +98,8 @@ class FetchPostService
                 'away_teams.logo_url as away_team_logo_url',
                 DB::raw("'amis' AS tag"),
             ])
-            ->addSelect(DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'));
+            ->addSelect(DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'))
+            ->addSelect(DB::raw('viewer_match_saves.publication_id IS NOT NULL AS viewer_has_saved'));
 
         if ($viewedIds !== []) {
             $query->whereNotIn('match_results.id', $viewedIds);
@@ -101,6 +107,7 @@ class FetchPostService
 
         $items = $query->get()->map(function (object $row): object {
             $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+            $row->viewer_has_saved = (bool) ($row->viewer_has_saved ?? false);
             $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
             $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
 
@@ -165,6 +172,8 @@ class FetchPostService
             ->where('users_id', $viewerUserId)
             ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
 
+        $viewerSavesSub = $this->viewerMatchSavesSubQuery($viewerUserId);
+
         $query = DB::table(function ($sub) use ($viewerUserId, $viewedIds, $viewerSportIds, $followingIds): void {
             $sub->from('match_results')
                 ->select('match_results.*')
@@ -201,6 +210,9 @@ class FetchPostService
             ->leftJoinSub($viewerLikesSub, 'viewer_match_likes', function ($join): void {
                 $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
             })
+            ->leftJoinSub($viewerSavesSub, 'viewer_match_saves', function ($join): void {
+                $join->on('viewer_match_saves.publication_id', '=', 'match_results.id');
+            })
             ->orderBy('match_results.validated_at', 'DESC');
 
         $items = $query
@@ -229,6 +241,7 @@ class FetchPostService
                 DB::raw('(('.$this->centreInteretDistanceMetersSql($viewerLat, $viewerLon).') / 1000) AS distance_km'),
                 DB::raw("'".self::CENTRE_INTERET_TAG."' AS tag"),
                 DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'),
+                DB::raw('viewer_match_saves.publication_id IS NOT NULL AS viewer_has_saved'),
             ])
             ->limit($cap)
 
@@ -236,6 +249,7 @@ class FetchPostService
             ->get()
             ->map(function (object $row): object {
                 $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+                $row->viewer_has_saved = (bool) ($row->viewer_has_saved ?? false);
                 $row->distance_km = (int) round((float) $row->distance_km);
                 $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
                 $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
@@ -294,6 +308,8 @@ class FetchPostService
             ->where('users_id', $viewerUserId)
             ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
 
+        $viewerSavesSub = $this->viewerMatchSavesSubQuery($viewerUserId);
+
         $query = DB::table(function ($sub) use ($viewerUserId, $viewedIds, $followingIds, $amisFeedIds, $centreInteretIds): void {
             $sub->from('match_results')
                 ->select('match_results.*')
@@ -329,6 +345,9 @@ class FetchPostService
             ->leftJoinSub($viewerLikesSub, 'viewer_match_likes', function ($join): void {
                 $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
             })
+            ->leftJoinSub($viewerSavesSub, 'viewer_match_saves', function ($join): void {
+                $join->on('viewer_match_saves.publication_id', '=', 'match_results.id');
+            })
             ->orderBy('match_results.validated_at', 'DESC');
 
         $items = $query
@@ -357,12 +376,14 @@ class FetchPostService
                 DB::raw('(('.$this->centreInteretDistanceMetersSql($viewerLat, $viewerLon).') / 1000) AS distance_km'),
                 DB::raw("'base_on_distance' AS tag"),
                 DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'),
+                DB::raw('viewer_match_saves.publication_id IS NOT NULL AS viewer_has_saved'),
             ])
             ->limit($cap)
             ->orderBy('distance_km', 'ASC')
             ->get()
             ->map(function (object $row): object {
                 $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+                $row->viewer_has_saved = (bool) ($row->viewer_has_saved ?? false);
                 $row->distance_km = (int) round((float) $row->distance_km);
                 $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
                 $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
@@ -496,6 +517,104 @@ class FetchPostService
      * Renvoie `null` si le post n'existe pas, n'est pas publié, est supprimé, ou si
      * sa visibilité l'interdit à l'observateur (le contrôleur traduit en 404).
      */
+    /**
+     * Récupère un lot de posts réguliers par leurs `id` (utilisé par la liste
+     * « Enregistrés » d'un utilisateur). Ne filtre PAS sur la visibilité car le
+     * viewer a déjà eu accès au post quand il l'a sauvegardé — on respecte
+     * néanmoins `deleted_at` et `status` (un post supprimé / dépublié disparaît
+     * de la liste sauvée plutôt que de pointer dans le vide).
+     *
+     * @param  array<int, int>  $postIds
+     * @return Collection<int, object>
+     */
+    public function fetchRegularPostsByIds(int $viewerUserId, array $postIds): Collection
+    {
+        if ($postIds === []) {
+            return collect();
+        }
+
+        $query = $this->regularPostBaseQuery($viewerUserId)
+            ->whereIn('posts.id', $postIds)
+            ->addSelect(DB::raw("'saved' AS tag"));
+
+        return $this->attachMediaToRegularPosts($query->get());
+    }
+
+    /**
+     * Récupère un lot de `match_results` validés par leurs `id` (utilisé par
+     * la liste « Enregistrés ») au format compatible `MatchFeedPost` côté app.
+     * Calque la query de `fetchMatchResultById` pour rester cohérent.
+     *
+     * @param  array<int, int>  $matchResultIds
+     * @return Collection<int, object>
+     */
+    public function fetchMatchResultsByIds(int $viewerUserId, array $matchResultIds): Collection
+    {
+        if ($matchResultIds === []) {
+            return collect();
+        }
+
+        $viewerLikesSub = DB::table('post_likes')
+            ->select('publication_id')
+            ->where('users_id', $viewerUserId)
+            ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
+
+        $viewerSavesSub = $this->viewerMatchSavesSubQuery($viewerUserId);
+
+        $rows = DB::table('match_results')
+            ->join('match_events', 'match_events.id', '=', 'match_results.match_event_id')
+            ->join('teams as home_teams', 'home_teams.id', '=', 'match_events.home_team_id')
+            ->join('teams as away_teams', 'away_teams.id', '=', 'match_events.away_team_id')
+            ->leftJoinSub($viewerLikesSub, 'viewer_match_likes', function ($join): void {
+                $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
+            })
+            ->leftJoinSub($viewerSavesSub, 'viewer_match_saves', function ($join): void {
+                $join->on('viewer_match_saves.publication_id', '=', 'match_results.id');
+            })
+            ->whereIn('match_results.id', $matchResultIds)
+            ->where('match_results.status', self::MATCH_RESULT_FEED_STATUS)
+            ->select([
+                'match_results.id',
+                // Discriminant utilisé par l'app pour distinguer les items
+                // de la liste saved. Aligne avec `publication_type='automatic'`
+                // stocké en base (`post_saves`) et utilisé par l'API toggle.
+                DB::raw("'automatic' AS publication_type"),
+                'match_results.match_event_id',
+                'match_results.status',
+                'match_results.home_score',
+                'match_results.away_score',
+                'match_results.total_comments',
+                'match_results.total_likes',
+                'match_results.submitted_by_user_id',
+                'match_results.submitted_at',
+                'match_results.validated_at',
+                'match_results.created_at',
+                'match_results.updated_at',
+                'match_events.scheduled_at',
+                'match_events.venue',
+                'match_events.status as match_event_status',
+                'home_teams.id as home_team_id',
+                'home_teams.name as home_team_name',
+                'home_teams.logo_url as home_team_logo_url',
+                'away_teams.id as away_team_id',
+                'away_teams.name as away_team_name',
+                'away_teams.logo_url as away_team_logo_url',
+                DB::raw("'saved' AS tag"),
+            ])
+            ->addSelect(DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'))
+            ->addSelect(DB::raw('viewer_match_saves.publication_id IS NOT NULL AS viewer_has_saved'))
+            ->get();
+
+        return $rows->map(function (object $row): object {
+            $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+            $row->viewer_has_saved = (bool) ($row->viewer_has_saved ?? false);
+            $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
+            $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
+
+            return $row;
+        });
+    }
+
     public function fetchRegularPostById(int $viewerUserId, int $postId): ?object
     {
         $meta = DB::table('posts')
@@ -543,12 +662,17 @@ class FetchPostService
             ->where('users_id', $viewerUserId)
             ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
 
+        $viewerSavesSub = $this->viewerMatchSavesSubQuery($viewerUserId);
+
         $row = DB::table('match_results')
             ->join('match_events', 'match_events.id', '=', 'match_results.match_event_id')
             ->join('teams as home_teams', 'home_teams.id', '=', 'match_events.home_team_id')
             ->join('teams as away_teams', 'away_teams.id', '=', 'match_events.away_team_id')
             ->leftJoinSub($viewerLikesSub, 'viewer_match_likes', function ($join): void {
                 $join->on('viewer_match_likes.publication_id', '=', 'match_results.id');
+            })
+            ->leftJoinSub($viewerSavesSub, 'viewer_match_saves', function ($join): void {
+                $join->on('viewer_match_saves.publication_id', '=', 'match_results.id');
             })
             ->where('match_results.id', $matchResultId)
             ->where('match_results.status', self::MATCH_RESULT_FEED_STATUS)
@@ -577,6 +701,7 @@ class FetchPostService
                 DB::raw("'detail' AS tag"),
             ])
             ->addSelect(DB::raw('viewer_match_likes.publication_id IS NOT NULL AS viewer_has_liked'))
+            ->addSelect(DB::raw('viewer_match_saves.publication_id IS NOT NULL AS viewer_has_saved'))
             ->first();
 
         if ($row === null) {
@@ -584,6 +709,7 @@ class FetchPostService
         }
 
         $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+        $row->viewer_has_saved = (bool) ($row->viewer_has_saved ?? false);
         $row->home_team_logo_url = PublicImageUrl::from($row->home_team_logo_url);
         $row->away_team_logo_url = PublicImageUrl::from($row->away_team_logo_url);
 
@@ -680,9 +806,28 @@ class FetchPostService
         );
     }
 
+    /**
+     * Sous-requête `post_saves` pour enrichir une query `match_results` avec
+     * `viewer_has_saved`. Couvre les deux `publication_type` car le viewer
+     * peut sauver un post auto (ligne dans `post_saves` avec
+     * `publication_type = 'automatic'`).
+     */
+    private function viewerMatchSavesSubQuery(int $viewerUserId): Builder
+    {
+        return DB::table('post_saves')
+            ->select('publication_id')
+            ->where('users_id', $viewerUserId)
+            ->whereIn('publication_type', self::MATCH_RESULT_LIKE_PUBLICATION_TYPES);
+    }
+
     private function regularPostBaseQuery(int $viewerUserId): Builder
     {
         $viewerLikesSub = DB::table('post_likes')
+            ->select('publication_id')
+            ->where('users_id', $viewerUserId)
+            ->where('publication_type', self::PUBLICATION_TYPE_REGULAR);
+
+        $viewerSavesSub = DB::table('post_saves')
             ->select('publication_id')
             ->where('users_id', $viewerUserId)
             ->where('publication_type', self::PUBLICATION_TYPE_REGULAR);
@@ -692,6 +837,9 @@ class FetchPostService
             ->leftJoin('user_profiles as author_profiles', 'author_profiles.user_id', '=', 'posts.user_id')
             ->leftJoinSub($viewerLikesSub, 'viewer_regular_likes', function ($join): void {
                 $join->on('viewer_regular_likes.publication_id', '=', 'posts.id');
+            })
+            ->leftJoinSub($viewerSavesSub, 'viewer_regular_saves', function ($join): void {
+                $join->on('viewer_regular_saves.publication_id', '=', 'posts.id');
             })
             ->where('posts.status', self::REGULAR_POST_FEED_STATUS)
             ->whereNull('posts.deleted_at')
@@ -715,6 +863,7 @@ class FetchPostService
                 'author_profiles.avatar_url as author_avatar_url',
                 'author_profiles.avatar_blurhash as author_avatar_blurhash',
                 DB::raw('viewer_regular_likes.publication_id IS NOT NULL AS viewer_has_liked'),
+                DB::raw('viewer_regular_saves.publication_id IS NOT NULL AS viewer_has_saved'),
             ]);
     }
 
@@ -760,6 +909,7 @@ class FetchPostService
 
         return $items->map(function (object $row) use ($mediaByPostId): object {
             $row->viewer_has_liked = (bool) ($row->viewer_has_liked ?? false);
+            $row->viewer_has_saved = (bool) ($row->viewer_has_saved ?? false);
             $row->author_avatar_url = PublicImageUrl::from($row->author_avatar_url);
             $row->media_count = (int) ($row->media_count ?? 0);
             $row->total_likes = (int) ($row->total_likes ?? 0);

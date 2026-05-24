@@ -20,9 +20,11 @@ use App\Http\Controllers\Api\V1\Posts\PostCommentsListController;
 use App\Http\Controllers\Api\V1\Posts\PostCommentStoreController;
 use App\Http\Controllers\Api\V1\Posts\PostDestroyController;
 use App\Http\Controllers\Api\V1\Posts\PostMatchResultLikeToggleController;
+use App\Http\Controllers\Api\V1\Posts\PostSaveToggleController;
 use App\Http\Controllers\Api\V1\Posts\PostStoreController;
 use App\Http\Controllers\Api\V1\Posts\RegularPostFeedController;
 use App\Http\Controllers\Api\V1\Posts\RegularPostShowController;
+use App\Http\Controllers\Api\V1\Posts\SavedPostsListController;
 use App\Http\Controllers\FetchGamePost;
 use Illuminate\Support\Facades\Route;
 
@@ -50,6 +52,14 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
         ->middleware('throttle:30,1')
         ->name('api.v1.auth.posts.destroy');
     Route::post('posts/{post_id}/likes', PostMatchResultLikeToggleController::class);
+    // Save / unsave un post (regular ou automatic) — bookmark privé.
+    Route::post('posts/{post_id}/saves', PostSaveToggleController::class)
+        ->whereNumber('post_id')
+        ->middleware('throttle:60,1');
+    // Liste unifiée des publications sauvegardées (regular + automatic) — onglet Profil.
+    Route::get('posts/saved', SavedPostsListController::class)
+        ->middleware('throttle:60,1')
+        ->name('api.v1.auth.posts.saved');
     Route::post('posts/{post_id}/comments', PostCommentStoreController::class);
     Route::get('posts/comments', PostCommentsListController::class);
     Route::post('posts/{post_id}/comments/{comment_id}/likes', PostCommentLikeToggleController::class);

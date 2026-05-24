@@ -125,6 +125,11 @@ class TeamMatchHistoryApiTest extends TestCase
 
         $response->assertJsonPath('data.matches.0.total_likes', 7);
         $response->assertJsonPath('data.matches.0.total_comments', 4);
+        // `submitted_by_user_id` exposé pour permettre l'ouverture contextuelle
+        // du menu ⋮ (Signaler / Bloquer) côté app.
+        $submittedByUserId = $response->json('data.matches.0.submitted_by_user_id');
+        $this->assertIsInt($submittedByUserId);
+        $this->assertGreaterThan(0, $submittedByUserId);
     }
 
     public function test_match_history_is_paginated_ten_per_page(): void

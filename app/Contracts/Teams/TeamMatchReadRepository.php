@@ -44,6 +44,7 @@ interface TeamMatchReadRepository
      *         away_score: int,
      *         total_likes: int,
      *         total_comments: int,
+     *         submitted_by_user_id: int,
      *         validated_at: ?string,
      *         scheduled_at: ?string,
      *         venue: ?string
