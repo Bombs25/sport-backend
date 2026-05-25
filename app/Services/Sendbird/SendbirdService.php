@@ -197,6 +197,91 @@ class SendbirdService
         return (array) $response->json();
     }
 
+    /**
+     * Liste paginée des group channels. `$token` est le `next` renvoyé par la page précédente
+     * (null pour la première page). `show_empty=true` inclut les canaux sans messages.
+     *
+     * @return array{channels: array<int, array<string, mixed>>, next: ?string}
+     */
+    public function listGroupChannels(?string $token = null, int $limit = 100): array
+    {
+        $response = $this->client()->get('/v3/group_channels', array_filter([
+            'limit' => $limit,
+            'token' => $token,
+            'show_empty' => 'true',
+        ]));
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Sendbird listGroupChannels failed: '.$response->body());
+        }
+
+        return [
+            'channels' => (array) ($response->json('channels') ?? []),
+            'next' => $response->json('next') ?: null,
+        ];
+    }
+
+    /**
+     * Supprime un group channel (et ses messages). Idempotent : un canal déjà absent
+     * (400201 / 400108) n'est pas considéré comme une erreur.
+     */
+    public function deleteGroupChannel(string $channelUrl): void
+    {
+        $response = $this->client()->delete('/v3/group_channels/'.$channelUrl);
+
+        if ($response->successful()) {
+            return;
+        }
+
+        $code = (int) ($response->json('code') ?? 0);
+        if (in_array($code, [400201, 400108], true)) {
+            return;
+        }
+
+        throw new RuntimeException('Sendbird deleteGroupChannel failed: '.$response->body());
+    }
+
+    /**
+     * Liste paginée des utilisateurs Sendbird.
+     *
+     * @return array{users: array<int, array<string, mixed>>, next: ?string}
+     */
+    public function listUsers(?string $token = null, int $limit = 100): array
+    {
+        $response = $this->client()->get('/v3/users', array_filter([
+            'limit' => $limit,
+            'token' => $token,
+        ]));
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Sendbird listUsers failed: '.$response->body());
+        }
+
+        return [
+            'users' => (array) ($response->json('users') ?? []),
+            'next' => $response->json('next') ?: null,
+        ];
+    }
+
+    /**
+     * Supprime un utilisateur Sendbird. Idempotent : utilisateur déjà absent (400201)
+     * n'est pas une erreur.
+     */
+    public function deleteUser(string $sendbirdUserId): void
+    {
+        $response = $this->client()->delete('/v3/users/'.$sendbirdUserId);
+
+        if ($response->successful()) {
+            return;
+        }
+
+        if ((int) ($response->json('code') ?? 0) === 400201) {
+            return;
+        }
+
+        throw new RuntimeException('Sendbird deleteUser failed: '.$response->body());
+    }
+
     private function client(): PendingRequest
     {
         if (empty($this->baseUrl) || empty($this->apiToken)) {
