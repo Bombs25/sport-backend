@@ -6,7 +6,8 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
+        "php": "^8.4",
+        "ext-bcmath": "*",
         "intervention/image": "^4.0",
         "kornrunner/blurhash": "^1.2",
         "kreait/laravel-firebase": "^7.1",

@@ -18,12 +18,22 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailFromSignedUrlController::clas
     ->name('verification.verify');
 
 /*
-| Retour Stripe Checkout (démo web / tests locaux). Pour React Native, remplacer par un schéma d’app dans .env.
+| Retour Stripe Checkout : pont web → deep link app. Stripe redirige ici (https requis),
+| puis cette page rebondit vers `<scheme>://billing/success|cancel` pour rouvrir l’app RN.
 */
 Route::get('/billing/checkout/return', function (Request $request) {
+    $result = $request->query('result') === 'success' ? 'success' : 'cancel';
+    $sessionId = $request->query('session_id');
+    $scheme = (string) config('billing.app_return_scheme', 'osport');
+
+    $deepLink = "{$scheme}://billing/{$result}";
+    if (is_string($sessionId) && $sessionId !== '') {
+        $deepLink .= '?session_id='.urlencode($sessionId);
+    }
+
     return view('billing.checkout-return', [
-        'result' => $request->query('result'),
-        'sessionId' => $request->query('session_id'),
+        'result' => $result,
+        'deepLink' => $deepLink,
     ]);
 })->name('billing.checkout.return');
 

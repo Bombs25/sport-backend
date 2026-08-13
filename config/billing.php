@@ -52,4 +52,17 @@ return [
 
     'checkout_cancel_url' => env('BILLING_CHECKOUT_CANCEL_URL'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Schéma d'app pour le retour deep link (React Native)
+    |--------------------------------------------------------------------------
+    |
+    | Stripe n'accepte pas un `success_url` en schéma custom : le Checkout revient
+    | d'abord sur la page web `billing/checkout/return`, qui **rebondit** ensuite vers
+    | `<scheme>://billing/success` ou `<scheme>://billing/cancel` pour rouvrir l'app.
+    | Doit correspondre au `scheme` de l'app Expo (osport-app/app.json).
+    |
+    */
+    'app_return_scheme' => env('BILLING_APP_RETURN_SCHEME', 'osport'),
+
 ];
