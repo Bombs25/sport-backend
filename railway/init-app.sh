@@ -7,7 +7,7 @@ set -e
 # Run migrations
 php artisan migrate:fresh --force
 
-# Clear cache
+# Clear cache--
 php artisan optimize:clear
 
 # Cache the various components of the Laravel application
