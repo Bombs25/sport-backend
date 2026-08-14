@@ -39,7 +39,7 @@ return [
         'port' => (int) env('TYPESENSE_PORT'),
         'protocol' => env('TYPESENSE_PROTOCOL'),
         'api_key' => env('TYPESENSE_API_KEY'),
-        // Désactivé automatiquement en APP_ENV=testing (voir TypesenseSyncGuard).
+        // Désactivé automatiquement en APP_ENV=testing (voir TypesenseSyncGuard). //
         'sync_enabled' => env('TYPESENSE_SYNC_ENABLED', true),
     ],
 
