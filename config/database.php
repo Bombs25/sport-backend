@@ -163,7 +163,7 @@ return [
             // URL complète (schéma redis[s]://) : alternative pratique au trio host/port/mot de passe quand l’hébergeur fournit un DSN unique.
             'url' => env('REDIS_URL'),
             // Hôte Redis (ignoré si une URL complète est fournie et utilisée pour la connexion).
-            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'host' => env('REDIS_HOST'),
             // Nom d’utilisateur ACL (Redis 6+) ou identifiant cloud ; laisser vide si l’instance n’en a pas besoin.
             'username' => env('REDIS_USERNAME'),
             // Secret d’authentification ; obligatoire sur les instances protégées, vide en local si Redis est ouvert.
