@@ -5,7 +5,7 @@
 set -e
 
 # Run migrations
-php artisan migrate:fresh --force
+#php artisan migrate:fresh --force
 
 # Clear cache--
 php artisan optimize:clear
@@ -15,3 +15,4 @@ php artisan config:cache
 php artisan event:cache
 php artisan route:cache
 php artisan view:cache
+
