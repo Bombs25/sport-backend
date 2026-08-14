@@ -36,7 +36,7 @@ return [
     ],
     'typesense' => [
         'host' => env('TYPESENSE_HOST'),
-        //'port' => (int) env('TYPESENSE_PORT'),
+        'port' => (int) env('TYPESENSE_PORT'),
         'protocol' => env('TYPESENSE_PROTOCOL'),
         'api_key' => env('TYPESENSE_API_KEY'),
         // Désactivé automatiquement en APP_ENV=testing (voir TypesenseSyncGuard). //
