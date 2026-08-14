@@ -29,15 +29,15 @@ return new class extends Migration
         });
 
         if (TypesenseSyncGuard::isEnabled()) {
-            // $client = app(Client::class);
+            $client = app(Client::class);
 
-            // try {
-            //     $client->collections['users']->delete();
-            // } catch (ObjectNotFound) {
-            //     //
-            // }
+            try {
+                $client->collections['users']->delete();
+            } catch (ObjectNotFound) {
+                //
+            }
 
-            // $client->collections->create(TypesenseUsersCollectionSchema::definition());
+            $client->collections->create(TypesenseUsersCollectionSchema::definition());
         }
 
         /*
