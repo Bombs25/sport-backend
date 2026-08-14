@@ -1,11 +1,11 @@
-#!/bin/bash
-# Make sure this file has executable permissions, run `chmod +x railway/init-app.sh`
+# #!/bin/bash
+# # Make sure this file has executable permissions, run `chmod +x railway/init-app.sh`
 
-# Exit the script if any command fails
-set -e
+# # Exit the script if any command fails
+# set -e
 
-# Run migrations
-#php artisan migrate:fresh --force
+# # Run migrations
+# #php artisan migrate:fresh --force
 
 # # Clear cache--
 # php artisan optimize:clear
