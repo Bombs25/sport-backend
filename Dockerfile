@@ -139,7 +139,7 @@ RUN mkdir -p \
     && php artisan event:cache \
     && php artisan route:cache \
     && php artisan view:cache  \
-    && php artisan migrate:fresh
+    && php artisan migrate:fresh --force
 
 
 # Railway provides PORT at runtime.
