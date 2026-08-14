@@ -48,17 +48,17 @@ return new class extends Migration
             $table->index(['user_id', 'status']);
         });
 
-        if (TypesenseSyncGuard::isEnabled()) {
-            $client = app(Client::class);
+        // if (TypesenseSyncGuard::isEnabled()) {
+        //     $client = app(Client::class);
 
-            try {
-                $client->collections['teams']->delete();
-            } catch (ObjectNotFound) {
-                //
-            }
+        //     try {
+        //         $client->collections['teams']->delete();
+        //     } catch (ObjectNotFound) {
+        //         //
+        //     }
 
-            $client->collections->create(TypesenseTeamService::schema());
-        }
+        //     $client->collections->create(TypesenseTeamService::schema());
+        // }
     }
     // cd backend && php artisan tinker --execute="app(App\Services\Search\TypesenseTeamService::class)->recreateCollection(); echo app(App\Services\Search\TypesenseTeamService::class)->syncAllTeamsFromDatabase();"
     public function down(): void
