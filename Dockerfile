@@ -135,6 +135,13 @@ RUN mkdir -p \
     bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
+    RUN php artisan config:cache \
+    && php artisan event:cache \
+    && php artisan route:cache \
+    && php artisan view:cache  \
+    && php artisan migrate:fresh
+
+
 # Railway provides PORT at runtime.
 ENV SERVER_NAME=:8080
 
