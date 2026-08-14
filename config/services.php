@@ -35,10 +35,10 @@ return [
         ],
     ],
     'typesense' => [
-        'host' => env('TYPESENSE_HOST', 'https://typesenses.echoppe.store'),
-        'port' => (int) env('TYPESENSE_PORT', 8080),
-        'protocol' => env('TYPESENSE_PROTOCOL', 'https'),
-        'api_key' => env('TYPESENSE_API_KEY', 'ri8zqlpvmkx1nvgu8kfzv808bhssyree'),
+        'host' => env('TYPESENSE_HOST'),
+        'port' => (int) env('TYPESENSE_PORT'),
+        'protocol' => env('TYPESENSE_PROTOCOL'),
+        'api_key' => env('TYPESENSE_API_KEY'),
         // Désactivé automatiquement en APP_ENV=testing (voir TypesenseSyncGuard).
         'sync_enabled' => env('TYPESENSE_SYNC_ENABLED', true),
     ],
