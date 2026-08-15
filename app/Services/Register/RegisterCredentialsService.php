@@ -41,7 +41,7 @@ class RegisterCredentialsService
         ?string $fcmToken = null,
     ): array {
         return DB::transaction(function () use ($email, $password, $city, $latitude, $longitude, $givenName, $familyName, $fcmToken) {
-            $civilName = trim($givenName.' '.$familyName)
+            $civilName = trim($givenName.' '.$familyName);
 
             $user = User::query()->create([
                 'name' => $civilName,
@@ -76,7 +76,7 @@ class RegisterCredentialsService
              * e-mail **code OTP 6 chiffres** (pas de lien signé dans le mail ; vérification côté API RN).
              * Autres écouteurs (welcome, intégrations) peuvent s’y brancher sans modifier ce service.
              */
-            event(new Registered($user));
+           // event(new Registered($user));
 
             $this->syncUserToTypesense($this->typesenseUsers, (int) $user->id);
 
