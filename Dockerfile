@@ -99,6 +99,7 @@ RUN install-php-extensions \
     tokenizer \
     xml \
     pcntl \
+    gd \
     zip
 
 # Composer
