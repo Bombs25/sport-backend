@@ -49,5 +49,11 @@ return [
         'api_token' => env('SENDBIRD_API_TOKEN'),
         'base_url' => env('SENDBIRD_API_BASE_URL'),
     ],
+    'mailgun' => [
+        'domain' => env('MAILGUN_DOMAIN'),
+        'secret' => env('MAILGUN_SECRET'),
+        'endpoint' => env('MAILGUN_ENDPOINT'),
+        'scheme' => 'https',
+    ],
 
 ];
