@@ -98,6 +98,7 @@ RUN install-php-extensions \
     session \
     tokenizer \
     xml \
+    pcntl \
     zip
 
 # Composer
