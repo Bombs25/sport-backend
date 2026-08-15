@@ -7,7 +7,7 @@ use App\Enums\ImageVariantLongEdge;
 interface ImageProcessingInterface
 {
     /** Disque privé pour originaux / variantes (jamais le disque par défaut des livrables). */
-    public const STAGING_DISK = 'local';
+    public const STAGING_DISK = 's3';
 
     public function generateblurhash(array $paths): string;
 
