@@ -41,7 +41,7 @@ class RegisterCredentialsService
         ?string $fcmToken = null,
     ): array {
         return DB::transaction(function () use ($email, $password, $city, $latitude, $longitude, $givenName, $familyName, $fcmToken) {
-            $civilName = trim($givenName.' '.$familyName);
+            $civilName = trim($givenName.' '.$familyName)
 
             $user = User::query()->create([
                 'name' => $civilName,
