@@ -3,4 +3,4 @@
 
 # This command runs the queue worker.
 # An alternative is to use the php artisan queue:listen command
-php artisan queue:work
+php artisan queue:work --queue=default,image-processing,post_notifications,sport-rank-notifications
