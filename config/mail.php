@@ -118,8 +118,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+        'address' => env('MAIL_FROM_ADDRESS', "email.echoppe.store"),
+        'name' => env('MAIL_FROM_NAME', "Osport"),
     ],
 
     /*
