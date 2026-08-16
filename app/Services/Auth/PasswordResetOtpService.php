@@ -34,7 +34,11 @@ class PasswordResetOtpService
 
         /** @var User $user */
         $user = User::query()->findOrFail($userId);
-        $user->notify(new PasswordResetCodeNotification($code));
+        // $user->notify(new PasswordResetCodeNotification($code));
+        $user->notify(
+            (new PasswordResetCodeNotification($code))
+                ->delay(now()->addMinutes(3))
+        );
     }
 
     /**
@@ -46,9 +50,11 @@ class PasswordResetOtpService
         $key = $this->cacheKey($email);
         $payload = Cache::store('app_main_cache')->get($key);
 
-        if (! is_array($payload)
+        if (
+            ! is_array($payload)
             || ! isset($payload['user_id'], $payload['code_hash'])
-            || ! hash_equals($payload['code_hash'], hash('sha256', $code))) {
+            || ! hash_equals($payload['code_hash'], hash('sha256', $code))
+        ) {
             return false;
         }
 
@@ -68,6 +74,6 @@ class PasswordResetOtpService
 
     private function cacheKey(string $normalizedEmail): string
     {
-        return 'auth:password-reset-otp:'.hash('sha256', $normalizedEmail);
+        return 'auth:password-reset-otp:' . hash('sha256', $normalizedEmail);
     }
 }
