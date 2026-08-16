@@ -186,7 +186,7 @@ return [
             // DSN Redis pour cette connexion : même variable d’environnement que `default` si un seul cluster sert tout.
             'url' => env('REDIS_URL'),
             // Hôte du serveur utilisé pour le cache (souvent le même que `default`, base logique différente via `database`).
-            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'host' => env('REDIS_HOST'),
             // Utilisateur ACL / cloud ; aligné sur `default` quand le cache vit sur la même instance Redis.
             'username' => env('REDIS_USERNAME'),
             // Mot de passe ou secret ; identique à `default` si les deux connexions pointent vers le même endpoint.
@@ -207,7 +207,7 @@ return [
 
         'post_notifications' => [
             'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'host' => env('REDIS_HOST'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
@@ -220,7 +220,7 @@ return [
 
         'app_main_cache' => [
             'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'host' => env('REDIS_HOST'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),

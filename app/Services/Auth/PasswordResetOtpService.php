@@ -37,7 +37,7 @@ class PasswordResetOtpService
         // $user->notify(new PasswordResetCodeNotification($code));
         $user->notify(
             (new PasswordResetCodeNotification($code))
-                ->delay(now()->addMinutes(3))
+                ->delay(now()->addSeconds(10))
         );
     }
 
