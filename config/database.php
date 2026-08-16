@@ -152,7 +152,7 @@ return [
         'options' => [
             // « Cluster » = Redis en grappe native : plusieurs nœuds qui partagent les données par partitions (slots) et se font remplacer en cas de panne.
             // Ici, l’option indique à Laravel d’activer ce mode (client + routage des commandes vers le bon nœud) ; `false` = une seule instance (standalone). La valeur par défaut `redis` cible le cluster Redis « classique ».
-            'cluster' => env('REDIS_CLUSTER', 'predis'),
+            'cluster' => env('REDIS_CLUSTER', 'redis'),
             // Préfixe toutes les clés : évite les collisions si plusieurs apps ou environnements partagent le même serveur Redis.
             'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-database-'),
             // Connexions persistantes : réduit le coût des handshakes TCP à chaque requête, au prix d’une gestion des connexions un peu plus délicate en prod.
