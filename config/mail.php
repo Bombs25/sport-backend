@@ -124,7 +124,7 @@ return [
     // env('MAIL_FROM_ADDRESS', "email.echoppe.store")
     //  env('MAIL_FROM_NAME', "Osport"),
     'from' => [
-        'address' =>  "email.echoppe.store",
+        'address' =>  "jbull635@gmail.com",
         'name' => 'Osport'
     ],
 
