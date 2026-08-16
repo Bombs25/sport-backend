@@ -115,12 +115,18 @@ RUN composer install \
     --optimize-autoloader \
     --no-scripts
 
+RUN apt-get update \
+    && apt-get install -y supervisor \
+    && rm -rf /var/lib/apt/lists/
+
 # Application
 COPY . .
 
 # Node / npm
 COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 COPY --from=node:22-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+COPY docker/supervisor/laravel-worker.conf /etc/supervisor/conf.d/laravel-worker.conf
 
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
