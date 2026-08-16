@@ -37,8 +37,6 @@ class PasswordResetOtpService
         // $user->notify(new PasswordResetCodeNotification($code));
         $user->notify(
             (new PasswordResetCodeNotification($code))
-                ->onConnection('redis')
-                ->onQueue('default')
                 ->delay(now()->addMinutes(3))
         );
     }
