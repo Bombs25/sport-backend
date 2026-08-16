@@ -34,11 +34,11 @@ class PasswordResetOtpService
 
         /** @var User $user */
         $user = User::query()->findOrFail($userId);
-        // $user->notify(new PasswordResetCodeNotification($code));
-        $user->notify(
-            (new PasswordResetCodeNotification($code))
-                ->delay(now()->addSeconds(10))
-        );
+        $user->notify(new PasswordResetCodeNotification($code));
+        // $user->notify(
+        //     (new PasswordResetCodeNotification($code))
+        //         ->delay(now()->addSeconds(10))
+        // );
     }
 
     /**
