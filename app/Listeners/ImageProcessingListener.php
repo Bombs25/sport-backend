@@ -39,7 +39,8 @@ class ImageProcessingListener
     public function handle(ImageProcessingEvent $event): void
     {
         $files = ImageProcessingStoreRequest::validatedFileList($event->files);
-
+        Log::info('all is good from here');
+        return ;
         /** @var FilesystemAdapter $disk staging privé ({@see ImageProcessingInterface::STAGING_DISK}) */
         $disk = Storage::disk(ImageProcessingInterface::STAGING_DISK);
         $batchKey = $event->uniqueKey;
