@@ -76,7 +76,7 @@ class ImageProcessingListener
 
         $fpHashes = array_column($candidates, 1);
         sort($fpHashes, SORT_STRING);
-        $fingerprint = hash('sha256', $variant->value."\0".implode("\0", $fpHashes));
+        $fingerprint = hash('sha256', $variant->value . "\0" . implode("\0", $fpHashes));
         $dedupKey = "image-processing:dedup:{$batchKey}:{$fingerprint}";
 
         if (! Cache::add($dedupKey, true, now()->addMinutes(30))) {
@@ -88,7 +88,7 @@ class ImageProcessingListener
         }
 
         $storedPaths = [];
-        $stagingRoot = "{$batchKey}/".Str::uuid()->toString();
+        $stagingRoot = "{$batchKey}/" . Str::uuid()->toString();
 
         foreach ($candidates as [$file,, $filename]) {
             $relativePath = "{$stagingRoot}/{$filename}";
@@ -120,7 +120,10 @@ class ImageProcessingListener
         $eventType = $event->type;
         $contextId = $event->contextId;
         $mediaFields = $event->mediaFields;
+        Log::info('all is good from here');
 
+
+        return;
         Bus::batch([
             new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
             [
@@ -230,7 +233,7 @@ class ImageProcessingListener
                     'total_jobs' => $batch->totalJobs,
                     'pending_jobs' => 0,
                     'failed_jobs' => $batch->failedJobs,
-                    'progress_bar' => '['.str_repeat('█', 24).'] 100%',
+                    'progress_bar' => '[' . str_repeat('█', 24) . '] 100%',
                 ], 'completed');
 
                 // Garder latestForUserKey pour le polling WebView (TTL 30 min dans publishUploadProgress).
@@ -301,7 +304,7 @@ class ImageProcessingListener
         $width = 24;
         $filled = (int) round($width * $percent / 100);
         $filled = min($width, max(0, $filled));
-        $bar = '['.str_repeat('█', $filled).str_repeat('░', $width - $filled)."] {$percent}%";
+        $bar = '[' . str_repeat('█', $filled) . str_repeat('░', $width - $filled) . "] {$percent}%";
 
         return [
             'batch_id' => $batch->id,

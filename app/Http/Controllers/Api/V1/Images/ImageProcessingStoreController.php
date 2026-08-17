@@ -17,28 +17,28 @@ use Illuminate\Validation\Rule;
  */
 class ImageProcessingStoreController extends Controller
 {
-    // public function __invoke(Request $request): JsonResponse
-    // {
-    //     $request->validate([
-    //         'variant_long_edge' => ['nullable', Rule::enum(ImageVariantLongEdge::class)],
-    //     ]);
+    public function __invoke(Request $request): JsonResponse
+    {
+        $request->validate([
+            'variant_long_edge' => ['nullable', Rule::enum(ImageVariantLongEdge::class)],
+        ]);
 
-    //     $files = $request->file('files', []);
-    //     if ($files instanceof UploadedFile) {
-    //         $files = [$files];
-    //     }
+        $files = $request->file('files', []);
+        if ($files instanceof UploadedFile) {
+            $files = [$files];
+        }
 
-    //     ImageProcessingEvent::dispatch(
-    //         $request->user(),
-    //         is_array($files) ? $files : [],
-    //         'images-'.Str::uuid()->toString(),
-    //         contextId: null,
-    //         variant: $request->enum('variant_long_edge', ImageVariantLongEdge::class) ?? ImageVariantLongEdge::Feed,
-    //         type: 'images',
-    //     );
+        ImageProcessingEvent::dispatch(
+            $request->user(),
+            is_array($files) ? $files : [],
+            'images-'.Str::uuid()->toString(),
+            contextId: null,
+            variant: $request->enum('variant_long_edge', ImageVariantLongEdge::class) ?? ImageVariantLongEdge::Feed,
+            type: 'images',
+        );
 
-    //     return response()->json([
-    //         'message' => __('Traitement des images lancé.'),
-    //     ], JsonResponse::HTTP_ACCEPTED);
-    // }
+        return response()->json([
+            'message' => __('Traitement des images lancé.'),
+        ], JsonResponse::HTTP_ACCEPTED);
+    }
 }
