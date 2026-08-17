@@ -121,6 +121,7 @@ class ImageProcessingListener
         $contextId = $event->contextId;
         $mediaFields = $event->mediaFields;
         Log::info('all is good from here');
+        
         return;
 
 
