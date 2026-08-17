@@ -21,7 +21,6 @@ final class PublicImageUrl
         if (Str::startsWith($path, ['http://', 'https://'])) {
             return $path;
         }
-
         return Storage::url(self::normalizeStoredPath($path));
     }
 
