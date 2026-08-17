@@ -120,8 +120,8 @@ class ImageProcessingListener
         $eventType = $event->type;
         $contextId = $event->contextId;
         $mediaFields = $event->mediaFields;
-        Log::info('all is good from here');
-        
+        Log::error('all is good from here');
+
         return;
 
 
