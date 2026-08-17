@@ -3,5 +3,5 @@
 
 # This command runs the queue worker.
 # An alternative is to use the php artisan queue:listen command
-php artisan queue:work redis --queue=default,image-processing,post_notifications,sport-rank-notifications 
+php artisan queue:listen redis --queue=default,image-processing,post_notifications,sport-rank-notifications 
 # --queue=default,image-processing,post_notifications,sport-rank-notifications
