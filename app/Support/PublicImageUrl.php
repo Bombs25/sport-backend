@@ -21,7 +21,11 @@ final class PublicImageUrl
         if (Str::startsWith($path, ['http://', 'https://'])) {
             return $path;
         }
-        return Storage::url(self::normalizeStoredPath($path));
+        // return Storage::url(self::normalizeStoredPath($path));
+        return Storage::disk('s3')->temporaryUrl(
+            self::normalizeStoredPath($path),
+            now()->addHour()
+        );
     }
 
     private static function normalizeStoredPath(string $path): string
