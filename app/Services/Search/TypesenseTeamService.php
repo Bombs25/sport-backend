@@ -12,6 +12,9 @@ use Typesense\Client;
 use Typesense\Exceptions\ObjectNotFound;
 use Typesense\Exceptions\TypesenseClientError;
 
+use Http\Client\Curl\Client as CurlClient;
+use Http\Discovery\Psr17FactoryDiscovery;
+
 class TypesenseTeamService
 {
     private Client $client;
@@ -44,9 +47,31 @@ class TypesenseTeamService
         'default_sorting_field' => 'created_at',
     ];
 
+    // public function __construct()
+    // {
+    //     $t = config('services.typesense');
+
+    //     $this->client = new Client([
+    //         'api_key' => $t['api_key'],
+    //         'nodes' => [
+    //             [
+    //                 'host' => $t['host'],
+    //                 'port' => $t['port'],
+    //                 'protocol' => $t['protocol'],
+    //             ],
+    //         ],
+    //         'connection_timeout_seconds' => 10,
+    //     ]);
+    // }
+
     public function __construct()
     {
         $t = config('services.typesense');
+
+        $curlClient = new CurlClient(
+            Psr17FactoryDiscovery::findResponseFactory(),
+            Psr17FactoryDiscovery::findStreamFactory(),
+        );
 
         $this->client = new Client([
             'api_key' => $t['api_key'],
@@ -58,6 +83,7 @@ class TypesenseTeamService
                 ],
             ],
             'connection_timeout_seconds' => 10,
+            'client' => $curlClient,
         ]);
     }
 
@@ -263,15 +289,15 @@ class TypesenseTeamService
         ];
 
         if ($sportId !== null) {
-            $filters[] = 'sport_id:='.$sportId;
+            $filters[] = 'sport_id:=' . $sportId;
         }
 
         if ($competitionType !== null && $competitionType !== '') {
-            $filters[] = 'competition_type:='.$competitionType;
+            $filters[] = 'competition_type:=' . $competitionType;
         }
 
         if ($skillLevel !== null && $skillLevel !== '') {
-            $filters[] = 'skill_level:='.$skillLevel;
+            $filters[] = 'skill_level:=' . $skillLevel;
         }
 
         $filters = array_merge($filters, self::buildSearchExclusionFilters($excludeCreatorId, $excludeTeamIds));
@@ -326,7 +352,7 @@ class TypesenseTeamService
         $response = $this->client->collections['teams']->documents->search([
             'q' => $q,
             'query_by' => 'name,slug',
-            'filter_by' => 'sport_id:='.$sportId,
+            'filter_by' => 'sport_id:=' . $sportId,
             'page' => 1,
             'per_page' => self::RANKING_SEARCH_MAX_HITS,
         ]);
@@ -469,16 +495,16 @@ class TypesenseTeamService
         $filters = [];
 
         if ($excludeCreatorId !== null) {
-            $filters[] = 'creator_id:!='.$excludeCreatorId;
+            $filters[] = 'creator_id:!=' . $excludeCreatorId;
         }
 
         $ids = array_values(array_unique(array_filter(
-            array_map(static fn (mixed $id): int => (int) $id, $excludeTeamIds),
-            static fn (int $id): bool => $id > 0,
+            array_map(static fn(mixed $id): int => (int) $id, $excludeTeamIds),
+            static fn(int $id): bool => $id > 0,
         )));
 
         if ($ids !== []) {
-            $filters[] = 'id:!=['.implode(', ', $ids).']';
+            $filters[] = 'id:!=[' . implode(', ', $ids) . ']';
         }
 
         return $filters;

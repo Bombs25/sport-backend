@@ -14,6 +14,9 @@ use Typesense\Client;
 use Typesense\Exceptions\ObjectNotFound;
 use Typesense\Exceptions\TypesenseClientError;
 
+use Http\Client\Curl\Client as CurlClient;
+use Http\Discovery\Psr17FactoryDiscovery;
+
 /**
  * Ce qu'il fait : gère la collection Typesense `users` (création et import de documents).
  *
@@ -24,9 +27,31 @@ class TypesenseUserService
 {
     private Client $client;
 
+    // public function __construct()
+    // {
+    //     $t = config('services.typesense');
+
+    //     $this->client = new Client([
+    //         'api_key' => $t['api_key'],
+    //         'nodes' => [
+    //             [
+    //                 'host' => $t['host'],
+    //                 'port' => $t['port'],
+    //                 'protocol' => $t['protocol'],
+    //             ],
+    //         ],
+    //         'connection_timeout_seconds' => 10,
+    //     ]);
+    // }
+
     public function __construct()
     {
         $t = config('services.typesense');
+
+        $curlClient = new CurlClient(
+            Psr17FactoryDiscovery::findResponseFactory(),
+            Psr17FactoryDiscovery::findStreamFactory(),
+        );
 
         $this->client = new Client([
             'api_key' => $t['api_key'],
@@ -38,6 +63,7 @@ class TypesenseUserService
                 ],
             ],
             'connection_timeout_seconds' => 10,
+            'client' => $curlClient,
         ]);
     }
 
@@ -187,7 +213,7 @@ class TypesenseUserService
         ];
 
         if ($excludeUserId !== null) {
-            $filters[] = 'id:!='.$excludeUserId;
+            $filters[] = 'id:!=' . $excludeUserId;
         }
 
         $response = $this->client->collections['users']->documents->search([
@@ -295,7 +321,7 @@ class TypesenseUserService
         $filters = ['is_private:=false'];
 
         if ($excludeUserId !== null) {
-            $filters[] = 'id:!='.$excludeUserId;
+            $filters[] = 'id:!=' . $excludeUserId;
         }
 
         $response = $this->client->collections['users']->documents->search([
