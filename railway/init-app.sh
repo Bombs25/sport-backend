@@ -16,3 +16,4 @@ php artisan event:cache
 php artisan route:cache
 php artisan view:cache
 
+php artisan sendbird:webhook   https://dev.echoppe.store/api/v1/sendbird/webhook
