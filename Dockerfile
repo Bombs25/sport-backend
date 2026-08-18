@@ -75,6 +75,7 @@ FROM dunglas/frankenphp:php8.4-bookworm
 
 WORKDIR /app
 
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 # System dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends unzip \
