@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.4",
         "ext-bcmath": "*",
+        "fakerphp/faker": "^1.24",
         "intervention/image": "^4.0",
         "kornrunner/blurhash": "^1.2",
         "kreait/laravel-firebase": "^7.1",
@@ -26,7 +27,6 @@
         "typesense/typesense-php": "^6.0"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.23",
         "laravel/boost": "^2.4",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",
