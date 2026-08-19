@@ -17,7 +17,7 @@ Route::prefix('v1')->group(function (): void {
 });
 
 Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
-    Route::post('billing/checkout', BillingCheckoutController::class)->middleware('throttle:auth-billing-write');
+    Route::get('billing/checkout', BillingCheckoutController::class)->middleware('throttle:auth-billing-write');
     Route::post('billing/subscription/cancel', BillingCancelSubscriptionController::class)->middleware('throttle:auth-billing-write');
     Route::get('billing/subscription', BillingSubscriptionController::class)->middleware('throttle:auth-billing-read');
     Route::get('billing/invoices', BillingInvoiceListController::class)->middleware('throttle:auth-billing-read');
