@@ -285,7 +285,7 @@ class TypesenseTeamService
         $lng = $this->formatGeoNumber($longitude);
         $radius = $this->formatGeoNumber($radiusKm);
         $filters = [
-            "location:({$lat}, {$lng}, {$radius} km)",
+            //"location:({$lat}, {$lng}, {$radius} km)",
         ];
 
         if ($sportId !== null) {
