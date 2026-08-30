@@ -43,7 +43,7 @@ class ImageProcessingStoreRequest extends FormRequest
             'files.*' => [
                 'required',
                 'file',
-                'max:5120',
+                'max:102400',
                 new RasterImageFile,
             ],
         ];

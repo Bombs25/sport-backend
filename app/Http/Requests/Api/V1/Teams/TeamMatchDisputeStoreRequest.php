@@ -21,7 +21,7 @@ class TeamMatchDisputeStoreRequest extends FormRequest
             'dispute_reason_fair_play' => ['sometimes', 'boolean'],
             'dispute_reason_behavior' => ['sometimes', 'boolean'],
             'details' => ['required', 'string', 'max:10000'],
-            'evidence' => ['nullable', 'file', 'image', 'max:5120'],
+            'evidence' => ['nullable', 'file', 'image', 'max:102400'],
         ];
     }
 

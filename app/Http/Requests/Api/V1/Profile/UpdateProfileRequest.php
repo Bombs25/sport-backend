@@ -45,7 +45,7 @@ class UpdateProfileRequest extends FormRequest
             'hide_online_status' => ['sometimes', 'boolean'],
             'language' => ['sometimes', 'string', Rule::in(['fr', 'en'])],
             'theme' => ['sometimes', 'string', Rule::in(['light', 'dark', 'auto'])],
-            'avatar_url' => ['sometimes', 'nullable', 'file', 'max:5120', new RasterImageFile],
+            'avatar_url' => ['sometimes', 'nullable', 'file', 'max:102400', new RasterImageFile],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'city' => ['sometimes', 'nullable', 'string', 'max:120'],
