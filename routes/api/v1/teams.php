@@ -29,7 +29,7 @@ use App\Http\Controllers\Api\V1\Teams\TeamShowController;
 use App\Http\Controllers\Api\V1\Teams\TeamStoreController;
 use App\Http\Controllers\Api\V1\Teams\TeamUpdateController;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\Api\V1\MapApiCotntroller;
 /*
 | Ce qu’il fait : CRUD + liste des équipes sous `/api/v1/auth/teams...` (Bearer Sanctum).
 |
@@ -107,4 +107,8 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
 
     // Détail d'une équipe (membre actif uniquement). +++++++
     // Route::get('teams/{team_id}', TeamShowController::class)->middleware('throttle:auth-team-read');
+
+    
 });
+
+// Route::get('/google-place-info', [MapApiCotntroller::class, 'getPlaceInfo']);
