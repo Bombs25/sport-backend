@@ -48,8 +48,7 @@ class MapApiCotntroller extends Controller
 
     public function add_region()
     {
-        DB::table('teams')->where('region', "=", null)
-            ->orWhere('region', "=", "")
+        DB::table('teams')
             ->chunkById(100, function ($teams) {
                 foreach ($teams as $team) {
                     DB::table('teams')
@@ -59,3 +58,6 @@ class MapApiCotntroller extends Controller
             });
     }
 }
+
+// ->where('region', "=", null)
+//             ->orWhere('region', "=", "")
