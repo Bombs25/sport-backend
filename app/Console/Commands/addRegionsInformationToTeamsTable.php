@@ -27,8 +27,8 @@ class addRegionsInformationToTeamsTable extends Command
     public function handle(MapApiCotntroller $map)
     {
         try {
-            $map->add_region();
-            $this->info('Regions ajouter avec success ✔');
+            $run = $map->add_region();
+            $this->info('Regions ajouter avec success ✔ ' .  $run);
             return self::SUCCESS;
         } catch (\Throwable $e) {
             $this->error('Échec : ' . $e->getMessage());

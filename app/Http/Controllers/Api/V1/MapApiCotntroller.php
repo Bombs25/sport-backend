@@ -48,14 +48,22 @@ class MapApiCotntroller extends Controller
 
     public function add_region()
     {
+        $value = '';
         DB::table('teams')
-            ->chunkById(100, function ($teams) {
+            ->chunkById(100, function ($teams) use (&$value) {
                 foreach ($teams as $team) {
+                    // On calcule l'information une seule fois par équipe
+                    $region = $this->getPlaceInfo($team->hq_latitude, $team->hq_longitude);
+
                     DB::table('teams')
                         ->where('id', $team->id)
-                        ->update(['region' => $this->getPlaceInfo($team->hq_latitude,  $team->hq_longitude)]);
+                        ->update(['region' => $region]);
+
+                    // Conserve la dernière valeur calculée
+                    $value = $region;
                 }
             });
+        return $value;
     }
 }
 

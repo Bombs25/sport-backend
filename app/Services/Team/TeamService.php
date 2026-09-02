@@ -12,12 +12,14 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Typesense\Exceptions\TypesenseClientError;
+use App\Http\Controllers\Api\V1\MapApiCotntroller;
 
 class TeamService
 {
     public function __construct(
         private readonly TypesenseTeamService $typesenseTeams,
         private readonly MatchResultService $matchResults,
+        public MapApiCotntroller $map
     ) {}
 
     /**
@@ -39,22 +41,22 @@ class TeamService
             ->where('user_id', $userId)
             ->where('status', 'active')
             ->pluck('team_id')
-            ->map(static fn ($id): int => (int) $id)
+            ->map(static fn($id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
 
-        $createdIds = $createdTeams->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        $createdIds = $createdTeams->pluck('id')->map(static fn($id): int => (int) $id)->all();
         $joinedIds = array_values(array_diff($memberTeamIds, $createdIds));
 
         $joinedTeams = $joinedIds === []
             ? collect()
             : DB::table('teams')
-                ->join('sports', 'sports.id', '=', 'teams.sport_id')
-                ->whereIn('teams.id', $joinedIds)
-                ->select('teams.*', 'sports.name as sport_name', 'sports.slug as sport_slug')
-                ->orderByDesc('teams.created_at')
-                ->get();
+            ->join('sports', 'sports.id', '=', 'teams.sport_id')
+            ->whereIn('teams.id', $joinedIds)
+            ->select('teams.*', 'sports.name as sport_name', 'sports.slug as sport_slug')
+            ->orderByDesc('teams.created_at')
+            ->get();
 
         $countsMap = $this->activeMemberCountsForTeamIds(array_values(array_unique(array_merge(
             $createdIds,
@@ -62,12 +64,12 @@ class TeamService
         ))));
 
         $createdPayload = $createdTeams
-            ->map(fn (object $row): array => $this->formatListRow($row, $countsMap))
+            ->map(fn(object $row): array => $this->formatListRow($row, $countsMap))
             ->values()
             ->all();
 
         $joinedPayload = $joinedTeams
-            ->map(fn (object $row): array => $this->formatListRow($row, $countsMap))
+            ->map(fn(object $row): array => $this->formatListRow($row, $countsMap))
             ->values()
             ->all();
 
@@ -91,10 +93,12 @@ class TeamService
         $slug = $this->allocateUniqueSlug($data['name']);
 
         $team = DB::transaction(function () use ($creatorId, $data, $slug): Team {
+            $get_regions = $this->map->getPlaceInfo($data['hq_latitude'], $data['hq_longitude']);
             $teamId = DB::table('teams')->insertGetId([
                 'creator_id' => $creatorId,
                 'sport_id' => $data['sport_id'],
                 'name' => $data['name'],
+                "region" => $get_regions,
                 'slug' => $slug,
                 'description' => $data['description'] ?? null,
                 'hq_city' => $data['hq_city'] ?? null,
@@ -440,7 +444,7 @@ class TeamService
 
         return [
             'items' => $rows
-                ->map(static fn (object $row): array => [
+                ->map(static fn(object $row): array => [
                     'user_id' => (int) $row->user_id,
                     'name' => $row->name,
                     'email' => $row->email,
@@ -561,7 +565,7 @@ class TeamService
             [
                 'members' => [
                     'items' => $memberRows
-                        ->map(static fn (object $row): array => [
+                        ->map(static fn(object $row): array => [
                             'user_id' => (int) $row->user_id,
                             'name' => $row->name,
                             'avatar_url' => PublicImageUrl::from($row->avatar_url),
@@ -829,7 +833,7 @@ class TeamService
         $matchResultIds = $rows
             ->pluck('match_result_id')
             ->filter()
-            ->map(static fn ($id): int => (int) $id)
+            ->map(static fn($id): int => (int) $id)
             ->unique()
             ->values()
             ->all();
@@ -840,15 +844,15 @@ class TeamService
                 ->whereIn('match_result_id', $matchResultIds)
                 ->whereIn('status', MatchResultService::OPEN_DISPUTE_STATUSES)
                 ->get(['match_result_id', 'id'])
-                ->mapWithKeys(static fn (object $disputeRow): array => [
+                ->mapWithKeys(static fn(object $disputeRow): array => [
                     (int) $disputeRow->match_result_id => (int) $disputeRow->id,
                 ])
                 ->all();
         }
 
         $collectiveTeamIds = $rows
-            ->filter(static fn (object $row): bool => $row->sport_practice_type === 'collective')
-            ->flatMap(static fn (object $row): array => [(int) $row->home_team_id, (int) $row->away_team_id])
+            ->filter(static fn(object $row): bool => $row->sport_practice_type === 'collective')
+            ->flatMap(static fn(object $row): array => [(int) $row->home_team_id, (int) $row->away_team_id])
             ->unique()
             ->values()
             ->all();
@@ -1124,7 +1128,7 @@ class TeamService
         $createdIds = DB::table('teams')
             ->where('creator_id', $userId)
             ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
+            ->map(static fn($id): int => (int) $id)
             ->all();
 
         $captainIds = DB::table('team_members')
@@ -1132,7 +1136,7 @@ class TeamService
             ->where('status', 'active')
             ->where('role', 'captain')
             ->pluck('team_id')
-            ->map(static fn ($id): int => (int) $id)
+            ->map(static fn($id): int => (int) $id)
             ->all();
 
         return array_values(array_unique(array_merge($createdIds, $captainIds)));
@@ -1246,11 +1250,11 @@ class TeamService
 
         while (DB::table('teams')
             ->where('slug', $slug)
-            ->when($exceptTeamId !== null, static fn ($q) => $q->where('id', '!=', $exceptTeamId))
+            ->when($exceptTeamId !== null, static fn($q) => $q->where('id', '!=', $exceptTeamId))
             ->exists()
         ) {
             $n++;
-            $slug = $base.'-'.$n;
+            $slug = $base . '-' . $n;
         }
 
         return $slug;
@@ -1323,11 +1327,11 @@ class TeamService
 
     private function cacheUserSportId(int $userId, int $sportId): void
     {
-        $cacheKey = 'register:user:sports:'.$userId;
+        $cacheKey = 'register:user:sports:' . $userId;
         $cachedSportIds = Cache::store('app_main_cache')->get($cacheKey, []);
         $normalizedSportIds = collect(is_array($cachedSportIds) ? $cachedSportIds : [])
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->filter(static fn (int $id): bool => $id > 0)
+            ->map(static fn(mixed $id): int => (int) $id)
+            ->filter(static fn(int $id): bool => $id > 0)
             ->push($sportId)
             ->unique()
             ->values()
