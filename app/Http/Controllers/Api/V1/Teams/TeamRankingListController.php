@@ -28,7 +28,7 @@ class TeamRankingListController extends Controller
     ): JsonResponse {
         $validated = $request->validated();
         $sportId = (int) $validated['sport_id'];
-        $region = (int) $validated['region'];
+        $region = (string) $validated['region'];
         $page = max(1, (int) ($validated['page'] ?? 1));
         $perPage = 10;
         $year = isset($validated['year'])
