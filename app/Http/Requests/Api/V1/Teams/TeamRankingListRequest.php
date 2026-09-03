@@ -17,11 +17,11 @@ class TeamRankingListRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sport_id' => ['required', 'integer', 'exists:sports,id'],
+            'sport_id' => ['nullable', 'integer', 'exists:sports,id'],
             'year' => ['nullable', 'integer', 'between:2000,2100'],
             'page' => ['nullable', 'integer', 'min:1'],
             'q' => ['nullable', 'string', 'max:100'],
-            'region' => ['required', 'string'],
+            'region' => ['nullable', 'string'],
         ];
     }
 }
