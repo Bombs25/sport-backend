@@ -93,6 +93,7 @@ class TeamRankingListController extends Controller
         return response()->json([
             'data' => [
                 'sport_id' => $sportId,
+                "region" => $region,
                 'year' => $year,
                 'season_key' => $seasonWindow->key,
                 'rankings' => $rankings,
