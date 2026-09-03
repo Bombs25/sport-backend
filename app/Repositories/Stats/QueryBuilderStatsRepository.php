@@ -51,8 +51,8 @@ class QueryBuilderStatsRepository implements StatsRepository
         DB::table('stats')
             ->where('id', (int) $statsId)
             ->update([
-                $counterColumn => DB::raw($counterColumn.' + 1'),
-                'point_count' => DB::raw('point_count + '.(int) $pointDelta),
+                $counterColumn => DB::raw($counterColumn . ' + 1'),
+                'point_count' => DB::raw('point_count + ' . (int) $pointDelta),
                 'updated_at' => $now,
             ]);
     }
@@ -84,7 +84,7 @@ class QueryBuilderStatsRepository implements StatsRepository
                 'rank_position',
             ])
             ->get()
-            ->keyBy(fn (object $row): int => (int) $row->team_id);
+            ->keyBy(fn(object $row): int => (int) $row->team_id);
 
         $snapshots = [];
         foreach ($teamIds as $teamId) {
@@ -113,6 +113,7 @@ class QueryBuilderStatsRepository implements StatsRepository
 
     public function loadSportRanking(
         int $sportId,
+        string $region,
         SeasonWindow $seasonWindow,
         int $page = 1,
         int $perPage = 10,
@@ -127,6 +128,7 @@ class QueryBuilderStatsRepository implements StatsRepository
                 DB::table('stats')
                     ->join('teams', 'teams.id', '=', 'stats.team_id')
                     ->where('stats.sport_id', $sportId)
+                    ->where('teams.region', $region)
                     ->whereBetween('stats.created_at', [
                         $seasonWindow->startDate->startOfDay()->toDateTimeString(),
                         $seasonWindow->endDate->endOfDay()->toDateTimeString(),
@@ -159,7 +161,7 @@ class QueryBuilderStatsRepository implements StatsRepository
             ->get();
 
         return $rows
-            ->map(static fn (object $row): array => [
+            ->map(static fn(object $row): array => [
                 'rank' => (int) $row->rank_position,
                 'team_id' => (int) $row->team_id,
                 'team_name' => (string) $row->team_name,
@@ -173,6 +175,12 @@ class QueryBuilderStatsRepository implements StatsRepository
             ->all();
     }
 
+    /**
+     * 
+     * Load the the avaible season years that all teams i've played
+     * @param int $sportId
+     * @return int[]
+     */
     public function loadAvailableRankingYears(int $sportId): array
     {
         return DB::table('stats')
@@ -181,7 +189,24 @@ class QueryBuilderStatsRepository implements StatsRepository
             ->distinct()
             ->orderByDesc('year_value')
             ->pluck('year_value')
-            ->map(static fn ($year): int => (int) $year)
+            ->map(static fn($year): int => (int) $year)
+            ->values()
+            ->all();
+    }
+    /**
+     * 
+     * Load the the avaible season years that all teams i've played
+     * @param int $sportId
+     * @return int[]
+     */
+    public function getAvailableRegionsOfTeams(int $sportId): array
+    {
+        return DB::table('teams')
+            ->select('region')
+            ->where('sport_id', $sportId)
+            ->distinct()
+            ->pluck('region')
+            ->map(static fn($region): string => (string) $region)
             ->values()
             ->all();
     }
@@ -194,6 +219,7 @@ class QueryBuilderStatsRepository implements StatsRepository
      *     draw: int,
      *     point_count: int
      * }
+     * Load the team season stat on the team profile page
      */
     public function loadTeamSeasonStats(
         int $teamId,
@@ -208,10 +234,10 @@ class QueryBuilderStatsRepository implements StatsRepository
             ->where('sport_id', $sportId)
             ->whereBetween('created_at', [$seasonStartAt, $seasonEndAt])
             ->selectRaw(
-                'COALESCE(SUM(victory_count), 0) as won_total, '.
-                'COALESCE(SUM(draw_count), 0) as draw_total, '.
-                'COALESCE(SUM(defeat_count), 0) as lost_total, '.
-                'COALESCE(SUM(point_count), 0) as points_total',
+                'COALESCE(SUM(victory_count), 0) as won_total, ' .
+                    'COALESCE(SUM(draw_count), 0) as draw_total, ' .
+                    'COALESCE(SUM(defeat_count), 0) as lost_total, ' .
+                    'COALESCE(SUM(point_count), 0) as points_total',
             )
             ->first();
 

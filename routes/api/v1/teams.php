@@ -84,6 +84,10 @@ Route::prefix('v1/auth')->middleware('auth:sanctum')->group(function (): void {
     // Annees disponibles pour le dropdown classement d'un sport.
     Route::get('teams/rankings/years', TeamRankingYearsListController::class)->middleware('throttle:auth-team-read');
 
+    Route::get('teams/rankings/regions',[TeamRankingYearsListController::class, "getAvailableRegionsOfTeams"])->middleware('throttle:auth-team-read');
+
+    // 
+
     // ////////// page match request ////////////
     // Liste des demandes de match (reçu/envoyé), paginée.
     Route::get('teams/match-requests', TeamMatchRequestListController::class)->middleware('throttle:auth-team-read');

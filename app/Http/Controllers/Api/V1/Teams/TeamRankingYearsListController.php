@@ -26,4 +26,16 @@ class TeamRankingYearsListController extends Controller
             ],
         ]);
     }
+
+    public function getAvailableRegionsOfTeams(TeamRankingListRequest $request, StatsRepository $statsRepository): JsonResponse
+    {
+        $sportId = (int) $request->validated('sport_id');
+        $regions = $statsRepository->getAvailableRegionsOfTeams($sportId);
+        return response()->json([
+            'data' => [
+                'sport_id' => $sportId,
+                'regions' =>  $regions,
+            ],
+        ]);
+    }
 }

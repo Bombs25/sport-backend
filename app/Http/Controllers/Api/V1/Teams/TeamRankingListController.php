@@ -28,6 +28,7 @@ class TeamRankingListController extends Controller
     ): JsonResponse {
         $validated = $request->validated();
         $sportId = (int) $validated['sport_id'];
+        $region = (int) $validated['region'];
         $page = max(1, (int) ($validated['page'] ?? 1));
         $perPage = 10;
         $year = isset($validated['year'])
@@ -59,6 +60,7 @@ class TeamRankingListController extends Controller
                     'data' => [
                         'sport_id' => $sportId,
                         'year' => $year,
+                        "region" => $region,
                         'season_key' => $seasonWindow->key,
                         'rankings' => [],
                         'pagination' => [
@@ -71,18 +73,18 @@ class TeamRankingListController extends Controller
             }
         }
 
-        $rankings = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page, $perPage, $filterTeamIds);
-        $hasMore = $statsRepository->loadSportRanking($sportId, $seasonWindow, $page + 1, $perPage, $filterTeamIds) !== [];
+        $rankings = $statsRepository->loadSportRanking($sportId, $region, $seasonWindow, $page, $perPage, $filterTeamIds);
+        $hasMore = $statsRepository->loadSportRanking($sportId, $region, $seasonWindow, $page + 1, $perPage, $filterTeamIds) !== [];
 
         $userTeamIds = DB::table('team_members')
             ->where('user_id', (int) $request->user()->id)
             ->where('status', 'active')
             ->pluck('team_id')
-            ->map(static fn ($id): int => (int) $id)
+            ->map(static fn($id): int => (int) $id)
             ->all();
 
         $rankings = array_map(
-            static fn (array $row): array => $row + [
+            static fn(array $row): array => $row + [
                 'is_current_user_team' => in_array($row['team_id'], $userTeamIds, true),
             ],
             $rankings,

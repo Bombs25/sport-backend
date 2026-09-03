@@ -34,6 +34,7 @@ interface StatsRepository
      */
     public function loadSportRanking(
         int $sportId,
+        string $region,
         SeasonWindow $seasonWindow,
         int $page = 1,
         int $perPage = 10,
@@ -44,6 +45,10 @@ interface StatsRepository
      * @return array<int, int>
      */
     public function loadAvailableRankingYears(int $sportId): array;
+    /**
+     * @return array<int, int>
+     */
+    public function getAvailableRegionsOfTeams(int $sportId): array;
 
     /**
      * Agrège les lignes stats d'une équipe sur la fenêtre saison (sums des compteurs).
