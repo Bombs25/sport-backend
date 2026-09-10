@@ -227,15 +227,15 @@ class ImageProcessingListener
 
                 // Log::info('Image processing batch finished.');
 
-                // self::publishUploadProgress($user, $batchKey, [
-                //     'batch_id' => $batch->id,
-                //     'percent' => 100,
-                //     'processed_jobs' => $batch->totalJobs,
-                //     'total_jobs' => $batch->totalJobs,
-                //     'pending_jobs' => 0,
-                //     'failed_jobs' => $batch->failedJobs,
-                //     'progress_bar' => '[' . str_repeat('█', 24) . '] 100%',
-                // ], 'completed',  $eventType);
+                self::publishUploadProgress($user, $batchKey, [
+                    'batch_id' => $batch->id,
+                    'percent' => 100,
+                    'processed_jobs' => $batch->totalJobs,
+                    'total_jobs' => $batch->totalJobs,
+                    'pending_jobs' => 0,
+                    'failed_jobs' => $batch->failedJobs,
+                    'progress_bar' => '[' . str_repeat('█', 24) . '] 100%',
+                ], 'completed',  $eventType);
 
                 // Garder latestForUserKey pour le polling WebView (TTL 30 min dans publishUploadProgress).
                 Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id));
