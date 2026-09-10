@@ -140,10 +140,10 @@ class ImageProcessingListener
                         ImagePipelineResultCache::ttl(),
                     );
                 }
-            })->progress(function (Batch $batch) use ($batchKey,  $userId, $user) {
+            })->progress(function (Batch $batch) use ($batchKey,  $userId, $user, $eventType) {
                 $payload = self::batchProgressPayload($batch);
 
-             //   self::publishUploadProgress($user, $batchKey, $payload, 'progress', $event->type);
+                self::publishUploadProgress($user, $batchKey, $payload, 'progress', $eventType);
 
                 Cache::put(
                     ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id),
@@ -165,7 +165,7 @@ class ImageProcessingListener
                 //     'name' => $batch->name,
                 //     'total_jobs' => $batch->totalJobs,
                 // ]);
-            })->catch(function (Batch $batch, Throwable $e) use ($user, $batchKey) {
+            })->catch(function (Batch $batch, Throwable $e) use ($user, $batchKey, $eventType) {
                 // Log::error('Image processing batch failed.', [
                 //     'batch_id' => $batch->id,
                 //     'name' => $batch->name,
@@ -173,15 +173,15 @@ class ImageProcessingListener
                 //     'error' => $e->getMessage(),
                 // ]);
 
-                // self::publishUploadProgress($user, $batchKey, [
-                //     'batch_id' => $batch->id,
-                //     'percent' => $batch->progress(),
-                //     'processed_jobs' => $batch->processedJobs(),
-                //     'total_jobs' => $batch->totalJobs,
-                //     'pending_jobs' => $batch->pendingJobs,
-                //     'failed_jobs' => $batch->failedJobs,
-                //     'progress_bar' => null,
-                // ], 'failed', $event->type);
+                self::publishUploadProgress($user, $batchKey, [
+                    'batch_id' => $batch->id,
+                    'percent' => $batch->progress(),
+                    'processed_jobs' => $batch->processedJobs(),
+                    'total_jobs' => $batch->totalJobs,
+                    'pending_jobs' => $batch->pendingJobs,
+                    'failed_jobs' => $batch->failedJobs,
+                    'progress_bar' => null,
+                ], 'failed', $eventType);
             })->finally(function (Batch $batch) use ($batchKey, $userId, $variant, $stagingRoot, $dedupKey, $eventType, $contextId, $user) {
                 Cache::forget($dedupKey);
 
