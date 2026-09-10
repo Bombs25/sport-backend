@@ -140,7 +140,7 @@ class ImageProcessingListener
                         ImagePipelineResultCache::ttl(),
                     );
                 }
-            })->progress(function (Batch $batch) use ($batchKey, $event, $userId, $user) {
+            })->progress(function (Batch $batch) use ($batchKey,  $userId, $user) {
                 $payload = self::batchProgressPayload($batch);
 
              //   self::publishUploadProgress($user, $batchKey, $payload, 'progress', $event->type);
@@ -165,7 +165,7 @@ class ImageProcessingListener
                 //     'name' => $batch->name,
                 //     'total_jobs' => $batch->totalJobs,
                 // ]);
-            })->catch(function (Batch $batch, Throwable $e) use ($user, $batchKey, $event) {
+            })->catch(function (Batch $batch, Throwable $e) use ($user, $batchKey) {
                 // Log::error('Image processing batch failed.', [
                 //     'batch_id' => $batch->id,
                 //     'name' => $batch->name,
