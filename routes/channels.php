@@ -3,7 +3,7 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
-Broadcast::channel('file.upload.progress.{userId}', function (?User $user, int|string $userId): bool {
+Broadcast::channel('file.upload.progress.{userId}.{type}', function (?User $user, int|string $userId, string $type): bool {
     if ($user === null) {
         return false;
     }

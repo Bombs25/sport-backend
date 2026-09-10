@@ -36,6 +36,7 @@ class FileUploadBroadcast implements ShouldBroadcastNow
         public User $user,
         public array $payload,
         public string $status = 'progress',
+        public string $type
     ) {}
 
     /**
@@ -44,7 +45,7 @@ class FileUploadBroadcast implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel("file.upload.progress.{$this->user->id}"),
+            new PrivateChannel("file.upload.progress.{$this->user->id}.{$this->type}"),
         ];
     }
 
