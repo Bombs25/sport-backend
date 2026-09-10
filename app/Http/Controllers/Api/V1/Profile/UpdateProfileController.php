@@ -31,16 +31,16 @@ class UpdateProfileController extends Controller
         $service->update($user->id, $data);
 
         if ($request->hasFile('avatar_url')) { 
-            // ImageProcessingEvent::dispatch(
-            //     $request->user(),
-            //     [
-            //         $request->file('avatar_url'),
-            //     ],
-            //     'profile-' . $user->id,
-            //     contextId: $user->id,
-            //     variant: ImageVariantLongEdge::GridThumb,
-            //     type: 'profile',
-            // );
+            ImageProcessingEvent::dispatch(
+                $request->user(),
+                [
+                    $request->file('avatar_url'),
+                ],
+                'profile-' . $user->id,
+                contextId: $user->id,
+                variant: ImageVariantLongEdge::GridThumb,
+                type: 'profile',
+            );
         }
 
         return response()->json([
