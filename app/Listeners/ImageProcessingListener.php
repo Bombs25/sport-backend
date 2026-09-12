@@ -126,7 +126,7 @@ class ImageProcessingListener
 
 
         Bus::batch([
-            new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
+            //new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
             [
                 new CompressImageJob($user, $batchKey, $processing, $paths, $event->variant),
                 new ConvertImageJob($user, $batchKey, $processing, $event->variant),

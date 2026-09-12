@@ -169,37 +169,39 @@ class ImageProcessing implements ImageProcessingInterface
                 array $paths,
                 ImageVariantLongEdge $variant
         ): array {
-                $out = [];
-
                 /*
-         * Récupération du disque S3.
-         */
-                $staging = Storage::disk(
-                        ImageProcessingInterface::STAGING_DISK
-                );
+                 * ---------------------------------------------------------
+                 * Compression temporairement désactivée
+                 * ---------------------------------------------------------
+                 *
+                 * Ancien traitement mis en pause.
+                 *
+                 * $out = [];
 
-                foreach ($paths as $path) {
-                        /*
-             * Vérification de l'objet directement dans S3.
-             */
-                        if (! $staging->exists($path)) {
-                                throw new RuntimeException(
-                                        "Image introuvable dans S3 pour compression: {$path}"
-                                );
-                        }
+                 * $staging = Storage::disk(
+                 *         ImageProcessingInterface::STAGING_DISK
+                 * );
 
-                        /*
-             * Lecture, traitement et écriture de la variante
-             * directement depuis/vers S3.
-             */
-                        $out[] = $this->writeSingleVariant(
-                                $staging,
-                                $path,
-                                $variant
-                        );
-                }
+                 * foreach ($paths as $path) {
+                 *         if (! $staging->exists($path)) {
+                 *                 throw new RuntimeException(
+                 *                         "Image introuvable dans S3 pour compression: {$path}"
+                 *                 );
+                 *         }
 
-                return $out;
+                 *         $out[] = $this->writeSingleVariant(
+                 *                 $staging,
+                 *                 $path,
+                 *                 $variant
+                 *         );
+                 * }
+
+                 * return $out;
+                 */
+
+                // On conserve le même contrat :
+                // les chemins originaux sont simplement retournés.
+                return $paths;
         }
 
         /**
@@ -369,170 +371,99 @@ class ImageProcessing implements ImageProcessingInterface
          */
         public function convert(array $paths): string
         {
-                $finalPaths = [];
-
                 /*
-         * IMPORTANT :
-         *
-         * On utilise le disque S3 explicitement.
-         *
-         * Il ne faut plus utiliser :
-         *
-         * Storage::put(...)
-         *
-         * car cette méthode utilise le disque par défaut.
-         */
-                $staging = Storage::disk(
-                        ImageProcessingInterface::STAGING_DISK
-                );
-
-                foreach ($paths as $path) {
-                        /*
-             * -----------------------------------------------------
-             * 1. Vérification sur S3
-             * -----------------------------------------------------
-             */
-                        if (! $staging->exists($path)) {
-                                throw new RuntimeException(
-                                        "Image introuvable dans S3 pour finalisation WebP: {$path}"
-                                );
-                        }
-
-                        /*
-             * -----------------------------------------------------
-             * 2. Lecture depuis S3
-             * -----------------------------------------------------
-             */
-                        $contents = $staging->get($path);
-
-                        if ($contents === null || $contents === '') {
-                                throw new RuntimeException(
-                                        "Impossible de lire le WebP intermédiaire depuis S3: {$path}"
-                                );
-                        }
-
-                        /*
-             * -----------------------------------------------------
-             * 3. Décodage en mémoire
-             * -----------------------------------------------------
-             */
-                        $image = $this->images->decode($contents);
-
-                        /*
-             * -----------------------------------------------------
-             * 4. Gestion des zones transparentes
-             * -----------------------------------------------------
-             */
-                        $image->fillTransparentAreas('#ffffff');
-
-                        /*
-             * -----------------------------------------------------
-             * 5. Détermination de la qualité
-             * -----------------------------------------------------
-             */
-                        $stem = pathinfo(
-                                $path,
-                                PATHINFO_FILENAME
-                        );
-
-                        $isGrid = str_ends_with(
-                                $stem,
-                                '_' . ImageVariantLongEdge::GridThumb->value
-                        );
-
-                        $quality = $isGrid
-                                ? 74
-                                : 80;
-
-                        /*
-             * -----------------------------------------------------
-             * 6. Encodage final WebP en mémoire
-             * -----------------------------------------------------
-             */
-                        $encoded = $image->encode(
-                                new WebpEncoder(
-                                        quality: $quality,
-                                        strip: true,
-                                )
-                        );
-
-                        /*
-             * -----------------------------------------------------
-             * 7. Construction du chemin final S3
-             * -----------------------------------------------------
-             */
-                        $normalized = str_replace(
-                                '\\',
-                                '/',
-                                $path
-                        );
-
-                        if (Str::contains(
-                                $normalized,
-                                '/variants/'
-                        )) {
-                                /*
-                 * Exemple :
+                 * ---------------------------------------------------------
+                 * Conversion temporairement désactivée
+                 * ---------------------------------------------------------
                  *
-                 * profile-1/UUID/variants/photo_500.webp
+                 * Ancien traitement mis en pause.
                  *
-                 * devient :
-                 *
-                 * temps/profile-1_UUID__photo_500.webp
+                 * $finalPaths = [];
+
+                 * $staging = Storage::disk(
+                 *         ImageProcessingInterface::STAGING_DISK
+                 * );
+
+                 * foreach ($paths as $path) {
+                 *         if (! $staging->exists($path)) {
+                 *                 throw new RuntimeException(
+                 *                         "Image introuvable dans S3 pour finalisation WebP: {$path}"
+                 *                 );
+                 *         }
+
+                 *         $contents = $staging->get($path);
+
+                 *         if ($contents === null || $contents === '') {
+                 *                 throw new RuntimeException(
+                 *                         "Impossible de lire le WebP intermédiaire depuis S3: {$path}"
+                 *                 );
+                 *         }
+
+                 *         $image = $this->images->decode($contents);
+                 *         $image->fillTransparentAreas('#ffffff');
+
+                 *         $stem = pathinfo(
+                 *                 $path,
+                 *                 PATHINFO_FILENAME
+                 *         );
+
+                 *         $isGrid = str_ends_with(
+                 *                 $stem,
+                 *                 '_' . ImageVariantLongEdge::GridThumb->value
+                 *         );
+
+                 *         $quality = $isGrid ? 74 : 80;
+
+                 *         $encoded = $image->encode(
+                 *                 new WebpEncoder(
+                 *                         quality: $quality,
+                 *                         strip: true,
+                 *                 )
+                 *         );
+
+                 *         $normalized = str_replace(
+                 *                 '\\',
+                 *                 '/',
+                 *                 $path
+                 *         );
+
+                 *         if (Str::contains($normalized, '/variants/')) {
+                 *                 $batchRoot = Str::before(
+                 *                         $normalized,
+                 *                         '/variants/'
+                 *                 );
+
+                 *                 $safeBatch = str_replace(
+                 *                         ['/', '\\'],
+                 *                         '_',
+                 *                         $batchRoot
+                 *                 );
+
+                 *                 $relative = "temps/{$safeBatch}__{$stem}.webp";
+                 *         } else {
+                 *                 $relative = "temps/{$stem}.webp";
+                 *         }
+
+                 *         $success = $staging->put(
+                 *                 $relative,
+                 *                 $encoded->toString()
+                 *         );
+
+                 *         if (! $success) {
+                 *                 throw new RuntimeException(
+                 *                         "Impossible d'écrire l'image finale dans S3: {$relative}"
+                 *                 );
+                 *         }
+
+                 *         $finalPaths[] = $relative;
+                 * }
                  */
-                                $batchRoot = Str::before(
-                                        $normalized,
-                                        '/variants/'
-                                );
 
-                                /*
-                 * Sécurisation du chemin métier.
-                 */
-                                $safeBatch = str_replace(
-                                        ['/', '\\'],
-                                        '_',
-                                        $batchRoot
-                                );
-
-                                $relative = "temps/{$safeBatch}__{$stem}.webp";
-                        } else {
-                                /*
-                 * Fallback pour un fichier qui ne serait pas
-                 * situé sous /variants/.
-                 */
-                                $relative = "temps/{$stem}.webp";
-                        }
-
-                        /*
-             * -----------------------------------------------------
-             * 8. Upload final directement vers S3
-             * -----------------------------------------------------
-             */
-                        $success = $staging->put(
-                                $relative,
-                                $encoded->toString()
-                        );
-
-                        if (! $success) {
-                                throw new RuntimeException(
-                                        "Impossible d'écrire l'image finale dans S3: {$relative}"
-                                );
-                        }
-
-                        /*
-             * Conservation du chemin final S3.
-             */
-                        $finalPaths[] = $relative;
-                }
-
-                /*
-         * ---------------------------------------------------------
-         * 9. Retour JSON
-         * ---------------------------------------------------------
-         */
+                // On conserve le même contrat :
+                // les chemins reçus sont retournés tels quels en JSON.
                 try {
                         return json_encode(
-                                $finalPaths,
+                                $paths,
                                 JSON_THROW_ON_ERROR
                         );
                 } catch (JsonException $e) {
