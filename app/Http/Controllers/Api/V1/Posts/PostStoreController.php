@@ -23,12 +23,12 @@ class PostStoreController extends Controller
         }
         $media = array_values($media);
 
-        // $post = $service->createRegularPost(
-        //     (int) $request->user()->id,
-        //     $validated['body'] ?? null,
-        //     (string) ($validated['visibility'] ?? 'public'),
-        //     count($media),
-        // );
+        $post = $service->createRegularPost(
+            (int) $request->user()->id,
+            $validated['body'] ?? null,
+            (string) ($validated['visibility'] ?? 'public'),
+            count($media),
+        );
 
         // if ($media !== []) {
         //     ImageProcessingEvent::dispatch(
