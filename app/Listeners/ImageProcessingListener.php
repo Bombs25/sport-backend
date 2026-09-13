@@ -126,7 +126,7 @@ class ImageProcessingListener
 
 
         Bus::batch([
-            //new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
+            // new GenerateBlurHashJob($user, $batchKey, $processing, $paths),
             [
                 new CompressImageJob($user, $batchKey, $processing, $paths, $event->variant),
                 new ConvertImageJob($user, $batchKey, $processing, $event->variant),
@@ -189,19 +189,19 @@ class ImageProcessingListener
 
                 Cache::forget(ImagePipelineResultCache::compressedPathsKey($batchKey, $userId, $variant, $batch->id));
 
-                $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId, $batch->id);
+                //  $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId, $batch->id);
                 $convertKey = ImagePipelineResultCache::convertKey($batchKey, $userId, $variant, $batch->id);
                 $mediaFieldsKey = ImagePipelineResultCache::mediaFieldsKey($batchKey, $userId, $batch->id);
 
-                $blurhash = Cache::get($blurKey);
+                // $blurhash = Cache::get($blurKey);
                 $convertJson = Cache::get($convertKey);
                 $convertPaths = is_string($convertJson)
                     ? json_decode($convertJson, true)
                     : null;
 
-                $blurhashes = is_string($blurhash) && $blurhash !== ''
-                    ? explode('|', $blurhash)
-                    : [];
+                // $blurhashes = is_string($blurhash) && $blurhash !== ''
+                //     ? explode('|', $blurhash)
+                //     : [];
 
                 $convertPathsPayload = is_array($convertPaths)
                     ? $convertPaths
@@ -214,15 +214,26 @@ class ImageProcessingListener
 
                 if ($eventType === 'team') {
                     $this->addFilesRepository->addTeamFilesUrlToDb(
-                        $blurhashes,
+                        [],
+                        // $blurhashes,
                         $convertPathsPayload,
                         $contextId,
                         $resolvedMediaFields,
                     );
                 } elseif ($eventType === 'profile') {
-                    $this->addFilesRepository->addProfileFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
+                    $this->addFilesRepository->addProfileFilesUrlToDb(
+                        [],
+                        // $blurhashes, 
+                        $convertPathsPayload,
+                        $contextId
+                    );
                 } elseif ($eventType === 'post') {
-                    $this->addFilesRepository->addPostFilesUrlToDb($blurhashes, $convertPathsPayload, $contextId);
+                    $this->addFilesRepository->addPostFilesUrlToDb(
+                        [],
+                        // $blurhashes, 
+                        $convertPathsPayload,
+                        $contextId
+                    );
                 }
 
                 // Log::info('Image processing batch finished.');
@@ -239,7 +250,7 @@ class ImageProcessingListener
 
                 // Garder latestForUserKey pour le polling WebView (TTL 30 min dans publishUploadProgress).
                 Cache::forget(ImagePipelineResultCache::progressKey($batchKey, $userId, $batch->id));
-                Cache::forget($blurKey);
+               // Cache::forget($blurKey);
                 Cache::forget($convertKey);
                 Cache::forget($mediaFieldsKey);
             })
