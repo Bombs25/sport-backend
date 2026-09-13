@@ -20,11 +20,8 @@ class PostService
         $normalizedBody = is_string($body) && trim($body) !== '' ? trim($body) : null;
         $now = now();
 
-        // return DB::transaction(function () use ($userId, $normalizedBody, $visibility, $mediaCount, $now): array {
-            
-        // });
-
-        $postId = (int) DB::table('posts')->insertGetId([
+        return DB::transaction(function () use ($userId, $normalizedBody, $visibility, $mediaCount, $now): array {
+            $postId = (int) DB::table('posts')->insertGetId([
                 'user_id' => $userId,
                 'body' => $normalizedBody,
                 'visibility' => $visibility,
@@ -51,6 +48,7 @@ class PostService
                 'published_at' => $now->toJSON(),
                 'media' => [],
             ];
+        });
     }
 
     /**
