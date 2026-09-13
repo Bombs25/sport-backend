@@ -185,8 +185,8 @@ class ImageProcessingListener
             })->finally(function (Batch $batch) use ($batchKey, $userId, $variant, $stagingRoot, $dedupKey, $eventType, $contextId, $user) {
                 Cache::forget($dedupKey);
 
-                self::removeStagingTree($stagingRoot, $batchKey);
-
+              //  self::removeStagingTree($stagingRoot, $batchKey); a remmtre pour convertion
+ 
                 Cache::forget(ImagePipelineResultCache::compressedPathsKey($batchKey, $userId, $variant, $batch->id));
 
                 //  $blurKey = ImagePipelineResultCache::blurhashKey($batchKey, $userId, $batch->id);
