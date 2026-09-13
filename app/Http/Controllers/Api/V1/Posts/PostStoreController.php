@@ -30,16 +30,16 @@ class PostStoreController extends Controller
             count($media),
         );
 
-        // if ($media !== []) {
-        //     ImageProcessingEvent::dispatch(
-        //         $request->user(),
-        //         $media,
-        //         'post-'.$post['id'],
-        //         contextId: (int) $post['id'],
-        //         variant: ImageVariantLongEdge::Feed,
-        //         type: 'post',
-        //     );
-        // }
+        if ($media !== []) {
+            ImageProcessingEvent::dispatch(
+                $request->user(),
+                $media,
+                'post-'.$post['id'],
+                contextId: (int) $post['id'],
+                variant: ImageVariantLongEdge::Feed,
+                type: 'post',
+            );
+        }
 
         // RegularPostPublishedNotificationJob::dispatch((int) $post['id'], (int) $request->user()->id)
         //     ->onQueue('post_notifications');
