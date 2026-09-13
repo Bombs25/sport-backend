@@ -23,29 +23,29 @@ class PostStoreController extends Controller
         }
         $media = array_values($media);
 
-        $post = $service->createRegularPost(
-            (int) $request->user()->id,
-            $validated['body'] ?? null,
-            (string) ($validated['visibility'] ?? 'public'),
-            count($media),
-        );
+        // $post = $service->createRegularPost(
+        //     (int) $request->user()->id,
+        //     $validated['body'] ?? null,
+        //     (string) ($validated['visibility'] ?? 'public'),
+        //     count($media),
+        // );
 
-        if ($media !== []) {
-            ImageProcessingEvent::dispatch(
-                $request->user(),
-                $media,
-                'post-'.$post['id'],
-                contextId: (int) $post['id'],
-                variant: ImageVariantLongEdge::Feed,
-                type: 'post',
-            );
-        }
+        // if ($media !== []) {
+        //     ImageProcessingEvent::dispatch(
+        //         $request->user(),
+        //         $media,
+        //         'post-'.$post['id'],
+        //         contextId: (int) $post['id'],
+        //         variant: ImageVariantLongEdge::Feed,
+        //         type: 'post',
+        //     );
+        // }
 
-        RegularPostPublishedNotificationJob::dispatch((int) $post['id'], (int) $request->user()->id)
-            ->onQueue('post_notifications');
+        // RegularPostPublishedNotificationJob::dispatch((int) $post['id'], (int) $request->user()->id)
+        //     ->onQueue('post_notifications');
 
         return response()->json([
-            'data' => $post,
+            'data' => "",
             'message' => __('Post publié.'),
         ], 201);
     }
